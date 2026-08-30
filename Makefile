@@ -14,7 +14,7 @@ PKGS    := ./...
 BINARIES := aubade aubade-lab
 
 .DEFAULT_GOAL := check
-.PHONY: all check vet build build-all test e2e clean fmt fmt-check hooks help
+.PHONY: all check vet build build-all test e2e golden clean fmt fmt-check hooks help
 
 all: build
 
@@ -51,6 +51,12 @@ test:
 e2e: build
 	@printf '\033[1m==> end-to-end regression\033[0m\n'
 	@./scripts/e2e-regression.sh
+
+## golden: rewrite the committed golden digests (do this deliberately, then read the diff).
+golden:
+	@printf '\033[1m==> regenerating golden digests\033[0m\n'
+	$(GO) test ./internal/digest -run TestGoldenDigests -update
+	@printf '    review the diff: a golden that changed by accident is a regression\n'
 
 ## fmt: rewrite sources with gofmt.
 fmt:

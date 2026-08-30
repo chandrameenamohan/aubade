@@ -45,34 +45,48 @@ func corpusFlags(c *cobra.Command) {
 	f.String("today", "", "anchor date, YYYY-MM-DD (default: system date, America/Los_Angeles)")
 }
 
-// loadToolbox reads the corpus named by the command's flags and binds it to the
+// loadCorpus reads the corpus named by the command's flags and binds it to the
 // anchor day.
-func loadToolbox(c *cobra.Command) (*extract.Toolbox, error) {
+//
+// It returns both halves because the two callers need different ones: the
+// toolbox commands want the extractors, and the digest wants the corpus too —
+// an agenda is a list of facts no extractor needs an opinion about.
+func loadCorpus(c *cobra.Command) (*model.Corpus, *extract.Toolbox, error) {
 	root, err := c.Flags().GetString("data")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	todayFlag, err := c.Flags().GetString("today")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	loc := model.Location()
 	today := time.Now().In(loc)
 	if strings.TrimSpace(todayFlag) != "" {
 		if today, err = extract.ParseToday(todayFlag, loc); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	if err := checkCorpusDir(root); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	corpus, err := model.LoadCorpus(c.Context(), localfs.New(root))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return extract.New(corpus, today, loc)
+	tb, err := extract.New(corpus, today, loc)
+	if err != nil {
+		return nil, nil, err
+	}
+	return corpus, tb, nil
+}
+
+// loadToolbox is loadCorpus for the callers that only need the extractors.
+func loadToolbox(c *cobra.Command) (*extract.Toolbox, error) {
+	_, tb, err := loadCorpus(c)
+	return tb, err
 }
 
 // checkCorpusDir fails early and helpfully when there is no corpus to read.
