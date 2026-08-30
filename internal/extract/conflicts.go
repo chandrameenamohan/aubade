@@ -55,10 +55,23 @@ var virtualLocationWords = []string{"zoom", "meet", "hangout", "teams", "webex",
 // than this between different rooms is an appointment nobody can keep.
 const transitionGapMinutes = 15
 
-// Conflicts reports collisions on the anchor day.
+// blockLookaheadDays is how far past the anchor day a protected block is still
+// worth defending. Two weeks is as far as the calendar this reads goes, and far
+// enough that a meeting booked over next Tuesday can still be moved.
+const blockLookaheadDays = 14
+
+// Conflicts reports collisions on the anchor day, plus new bookings over a
+// protected block in the days ahead.
 func (t *Toolbox) Conflicts() (model.Signals, error) {
 	g := newIDs()
-	live := t.liveEventsOn(t.day)
+	out := t.dayConflicts(g, t.day)
+	out = append(out, t.newBookingsOverBlocks(g)...)
+	return out, nil
+}
+
+// dayConflicts is every collision on one day's calendar.
+func (t *Toolbox) dayConflicts(g *ids, day time.Time) model.Signals {
+	live := t.liveEventsOn(day)
 	var out model.Signals
 
 	for i := 0; i < len(live); i++ {
@@ -73,7 +86,79 @@ func (t *Toolbox) Conflicts() (model.Signals, error) {
 			}
 		}
 	}
-	return out, nil
+	return out
+}
+
+// newBookingsOverBlocks reports meetings someone booked over a protected block
+// on a day that has not arrived yet.
+//
+// The digest is about today; this is the one calendar fact that is not. The
+// profile states it as a grievance rather than a preference — "I block 9-11am
+// Tue/Thu for deep work. Anyone scheduling over that block without asking is
+// doing something wrong, and I want to know" — and a violation is only
+// actionable while there is still time to move it, which is precisely before
+// the day arrives.
+//
+// Two bounds keep this from becoming a standing complaint. It looks ahead only
+// as far as blockLookaheadDays, and it reports a booking only in the digest
+// that follows it being made: "I want to know" is answered once, the morning
+// after someone did it, not every morning until the meeting happens.
+func (t *Toolbox) newBookingsOverBlocks(g *ids) model.Signals {
+	var out model.Signals
+	for d := 1; d <= blockLookaheadDays; d++ {
+		day := t.day.AddDate(0, 0, d)
+		live := t.liveEventsOn(day)
+		for i := 0; i < len(live); i++ {
+			for j := i + 1; j < len(live); j++ {
+				block, booking := live[i], live[j]
+				if isDeepWork(booking) {
+					block, booking = booking, block
+				}
+				if !isDeepWork(block) || isDeepWork(booking) || !overlaps(block, booking) {
+					continue
+				}
+				if !t.bookedSinceLastDigest(booking) {
+					continue
+				}
+				out = append(out, t.blockViolationSignal(g, block, booking))
+			}
+		}
+	}
+	return out
+}
+
+// bookedSinceLastDigest reports whether an event was put on the calendar since
+// the previous morning's digest would have run. An event with no CREATED
+// timestamp is not new — a missing provenance stamp is not evidence of
+// anything, and guessing "new" would make every meeting an alarm.
+func (t *Toolbox) bookedSinceLastDigest(ev *model.CalEvent) bool {
+	if ev.Created.IsZero() {
+		return false
+	}
+	return !ev.Created.Before(t.now.AddDate(0, 0, -1)) && !ev.Created.After(t.now)
+}
+
+// blockViolationSignal renders one meeting booked over a protected block. It
+// says when the block is, who booked over it and when they did it: "at 21:40
+// last night, without asking" is the part the profile is actually complaining
+// about.
+func (t *Toolbox) blockViolationSignal(g *ids, block, booking *model.CalEvent) model.Signal {
+	return model.Signal{
+		ID:       g.next(model.KindConflicts, "block", block.UID, booking.UID),
+		Kind:     model.KindConflicts,
+		Priority: model.P1,
+		Title: fmt.Sprintf("booked over your protected block: %s on %s",
+			truncate(booking.Summary, 40), booking.Start.In(t.loc).Format("Mon 2 Jan")),
+		Detail: fmt.Sprintf("%s (%s %s–%s%s) was added %s over %s (%s–%s).",
+			quote(booking.Summary), booking.Start.In(t.loc).Format("Mon 2 Jan"),
+			t.clock(booking.Start), t.clock(booking.End), organizerSuffix(booking),
+			booking.Created.In(t.loc).Format("Mon 2 Jan 15:04"),
+			quote(block.Summary), t.clock(block.Start), t.clock(block.End)),
+		Citations:   []model.Citation{eventCite(block.UID), eventCite(booking.UID)},
+		SectionHint: model.SectionCalendar,
+		Confidence:  model.Certain,
+		Deadline:    timePtr(booking.Start),
+	}
 }
 
 // liveEventsOn returns the events happening on the given day that the owner is

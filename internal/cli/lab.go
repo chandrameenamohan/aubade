@@ -80,26 +80,32 @@ func newEvalCmd() *cobra.Command {
 Grade a digest against traps.json and write out/scorecard.md, with the regression
 and capability sections kept separate. Exits non-zero on any regression miss.
 
-Graders assert on outputs, never on which tools the agent chose to call: a
-positive trap passes when its signal kind appears in signals.json AND at least one
-expected keyword appears in the digest text; a negative trap passes when it is
-absent from both.
+It grades what is on disk — out/digest.md and the out/signals.json beside it —
+rather than composing a page of its own, so what gets graded is what the product
+actually wrote.
 
-  --sabotage  disable one extractor, then ALARM if the score does not drop. A
-              grader that cannot see a broken extractor is not a grader.
-  --judge     add the layer-2 model judge for the one axis code cannot grade —
-              "does this read like the sample, in the user's voice" — anchored,
-              reason-before-score, with an "uncertain" escape hatch.`),
+Graders assert on outputs, never on which tools the agent chose to call. A
+positive trap passes when a signal cites the evidence that trap planted AND at
+least one expected keyword appears in the digest text. A negative trap passes
+when no signal claims it: absence is graded on signals rather than on words,
+because the page quotes the very profile rule that suppressed an item and lists
+the meeting it was told not to make a fuss about.
+
+  --capability  run the agentic suite: N isolated trials, reported as pass^N and
+                pass@N, never one number. Needs the claude CLI; skips loudly
+                without it, because an unmeasured suite must never read as a
+                passing one.
+  --sabotage    disable one extractor, then ALARM if the score does not drop. A
+                grader that cannot see a broken extractor is not a grader.
+  --judge       add the layer-2 model judge for the one axis code cannot grade —
+                "does this read like the sample, in the user's voice" — anchored,
+                reason-before-score, with an "uncertain" escape hatch.
+  --adversarial report how each negative trap stayed out: the rule that held it
+                back, or the fact that nothing ever looked at it.`),
 		Args: cobra.NoArgs,
-		RunE: stub("D1", "the trap harness, scorecard, and the make check regression run"),
+		RunE: func(c *cobra.Command, _ []string) error { return runEval(c) },
 	}
 
-	f := c.Flags()
-	f.String("sabotage", "", "disable one extractor by name and alarm if the score does not drop")
-	f.Bool("judge", false, "run the optional layer-2 model judge for voice and readability")
-	f.Bool("adversarial", false, "run the adversarial pass: negative traps and suppression pressure")
-	f.String("out", "out/", "directory for scorecard.md and per-trial artifacts")
-
-	annotate(c, "D1")
+	evalFlags(c)
 	return c
 }

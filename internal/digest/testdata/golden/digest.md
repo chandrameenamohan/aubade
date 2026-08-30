@@ -67,7 +67,7 @@ Nobody is blocked on a decision from you.
 
 ## I'm not sure
 - **Promise to Priya Iyer recorded in notes/staffing-sync.md and not delivered.** The note says "Committed to Priya: a written hiring plan for the Q4 engineering roles". Nothing in the owner's later mail or the task list closes it. The note itself calls it overdue, but carries no date to hold it to. *[note: notes/staffing-sync.md]*
-- **Dana Reyes has slowed down — SSO rollout question.** Waiting on you for 3 business days against a 1 business day baseline over 3 messages; "Thanks. Our security lead wants the SOC 2 letter too — can you send it?". A slowdown is not proof of a problem — the thread is shown rather than ranked. *[email: Dana, Aug 26 10:00] [email: Dana, Aug 25 09:00]*
+- **Dana Reyes has slowed down — SSO rollout question.** Waiting on you for 3 business days against a 1 business day baseline over 3 messages, so the reply cadence has stretched; "Thanks. Our security lead wants the SOC 2 letter too — can you send it?". A slowdown is not proof of a problem — the thread is shown rather than ranked. *[email: Dana, Aug 26 10:00] [email: Dana, Aug 25 09:00]*
 
 ## Honesty
 - **Veritas Components quarterly review is cancelled on the calendar but live in the mail.** The invite is cancelled; Pat Nkemelu <pat@veritas.example> wrote "See you at 9 tomorrow for the Veritas Components quarterly review" at Sun 30 Aug 18:00. Both sides are shown; neither was picked. *[cal: Veritas Components quarterly review, added Aug 28 07:00] [email: Pat, Aug 30 18:00]*

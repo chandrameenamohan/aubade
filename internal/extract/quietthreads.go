@@ -145,7 +145,11 @@ func (t *Toolbox) cadenceSignal(g *ids, th *Thread, priority model.Priority, qui
 		Kind:     model.KindQuietThreads,
 		Priority: priority,
 		Title:    fmt.Sprintf("%s has slowed down — %s", who, truncate(th.Subject, 60)),
-		Detail: fmt.Sprintf("%s for %s against a %s baseline over %d messages; %s. A slowdown is not proof of a problem — the thread is shown rather than ranked.",
+		// The sentence names what was measured. "Waiting on them for five days"
+		// is a fact about one gap; the finding is that the reply cadence on this
+		// thread has stretched, and a line that never says so leaves the reader
+		// to infer the only thing the signal actually knows.
+		Detail: fmt.Sprintf("%s for %s against a %s baseline over %d messages, so the reply cadence has stretched; %s. A slowdown is not proof of a problem — the thread is shown rather than ranked.",
 			side, businessDayPhrase(quiet), businessDayPhrase(baseline), len(th.Messages),
 			quote(truncate(last.Body, 140))),
 		Citations:   dedupeCitations([]model.Citation{emailCite(last.ID), emailCite(th.First().ID)}),

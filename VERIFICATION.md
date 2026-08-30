@@ -17,8 +17,8 @@ each define their own bar is three bars, and the loosest one wins in practice.
 make check
   ├─ go vet ./...              static analysis, every package
   ├─ go build ./...            every package compiles
-  ├─ go test ./...             unit tests
-  └─ scripts/e2e-regression.sh end-to-end regression scenario   ← STUB (bead D1)
+  ├─ go test ./...             unit tests, incl. the in-process reference run
+  └─ scripts/e2e-regression.sh generate → digest --no-llm → eval, through the binaries
 ```
 
 `make check` also builds `bin/aubade` and `bin/aubade-lab` on the way through,
@@ -64,8 +64,8 @@ API keys and no network beyond the Go module cache:
   from that trap's own cited evidence, no reply predates the message it answers,
   and the same `(seed, --today)` produces a byte-identical plan. What it does
   *not* assert is that anything finds those traps: the extractors are graded
-  against their own fixtures (below), and the exam and the student are only
-  joined by the eval harness in bead D1.
+  against their own fixtures (below), and the exam and the student are joined by
+  the eval harness (below).
 - **The deterministic toolbox** (`internal/extract`) — the seven extractors, `thread`
   and `search`, run against hand-written fixture corpora under
   `internal/extract/testdata/` with a fixed `--today`. Both directions are asserted:
@@ -78,6 +78,15 @@ API keys and no network beyond the Go module cache:
   resolve to a record in the corpus. These fixtures are deliberately *not* the
   generated corpus: an extractor graded only against the data its own teammate
   planted proves less than one graded against a corpus written to trip it.
+  Three behaviours the trap harness found missing in bead D1 have their own
+  hand-built corpora, each with the boundary that keeps it from becoming noise:
+  a meeting booked over a *future* protected block is reported the morning after
+  it was booked and not again, is ignored when it carries no CREATED stamp, and
+  stops at the lookahead horizon; an approval with no question mark
+  ("three expense reports need your approval") is a dispatchable while an FYI is
+  not; and a note that says something slipped against a later mail that says it
+  did not is a contradiction, while one shared word or a mail that predates the
+  note is not.
 - **The digest composer** (`internal/digest`) — scoring, sectioning, drafting
   and rendering, over two pinned fixture corpora under
   `internal/digest/testdata/`, each with a **committed golden page** compared
@@ -119,10 +128,39 @@ API keys and no network beyond the Go module cache:
   merely requested: the honesty floor is appended from the fact base whatever
   the composer wrote, it survives a `--customize` prompt that asks for it to go
   away, and the footer names who orchestrated, who voted, and who could not.
-- **The end-to-end regression scenario** (once bead D1 lands) — `aubade-lab generate`
-  is seeded, `aubade digest --no-llm` runs a fixed extractor order over that fixed
-  corpus, and `aubade-lab eval` asserts each planted trap present and each negative
-  trap absent. Same seed, same `--today`, same answer, on every machine.
+- **The eval harness** (`internal/eval`) — the graders themselves, tested against
+  hand-built fact bases rather than against the corpus that already passes. What
+  is pinned is the *semantics*: a positive task needs both halves (a signal
+  citing its planted evidence **and** a keyword on the page, so "extracted and
+  then lost in the render" is a distinct, named failure); the expected extractor
+  is reported and not enforced, so an engine that finds the right item by a
+  better route is not punished; a `suppressions` signal in the honesty section is
+  the record of *not* surfacing something and does not fail a negative task,
+  while the same kind in any other section does. Around them: the grounding
+  check catches an injected citation and is not fooled by markdown links, the
+  pass^N / pass@N arithmetic is asserted on fabricated trials, and the judge is
+  driven by scripted runners — one runner decides alone, a split falls to
+  `uncertain`, a runner that errors is dropped, and a grade with no reasoning
+  behind it is refused because reason-before-score is the contract.
+- **The reference solution** (`internal/eval/reference_test.go`) — the
+  generate → digest → eval pipeline, in-process, on every `go test`: the pinned
+  corpus (seed 42, `--today 2026-08-30`) is generated, the deterministic page is
+  composed from it, and it is graded against the answer key the generator wrote.
+  Every positive trap is caught and every negative one stays out, so a task an
+  agent misses later is a task that was provably catchable. The page is
+  committed as `internal/eval/testdata/golden/digest.md` and compared byte for
+  byte, and every citation on it is asserted to resolve against the fact base it
+  was composed from. Sabotage is asserted here too, in both directions: disabling
+  each of the seven extractors in turn must drop the score, and disabling one
+  that no graded task depends on must raise the alarm — otherwise the
+  "graders can see" claim is decoration.
+- **The end-to-end regression scenario** — the same run again, through the real
+  binaries: `aubade-lab generate --seed 42 --today 2026-08-30 --out data/` →
+  `aubade digest --no-llm --out out/` → `aubade-lab eval --out out/`, exiting
+  non-zero on any missed trap. It is slower and coarser than the in-process
+  version and it proves the thing that one cannot: that the commands can be
+  driven from a shell and write the files they promise. Same seed, same
+  `--today`, same answer, on every machine.
 
 The rule behind all of that: **non-deterministic checks never gate.** A flaky gate
 gets bypassed, and a bypassed gate is worse than none because it still gets cited
@@ -132,56 +170,47 @@ as evidence.
 
 ## 3 · What is NOT verified yet — read this before trusting a green run
 
-### 3.1 The end-to-end regression is a stub (bead D1)
+### 3.1 What the gate now proves, and what it still does not
 
-`scripts/e2e-regression.sh` currently prints
+The e2e stub is gone. As of bead D1 a green `make check` proves the thing the
+assignment actually grades: a digest built from the **generated** corpus catches
+every planted trap and surfaces none of the negatives. The exam and the student
+are joined, in two independent places — in-process on every `go test`, and
+through the real binaries in `scripts/e2e-regression.sh`, which exits non-zero on
+any miss.
 
-```
-PENDING: regression eval wired in bead D1
-```
+What a green gate still does not prove, and the honest list is short:
 
-on **every** run, and exits 0. It verifies only that both binaries built and are
-executable.
+- **Nothing about the agentic page.** Every gated check runs the `--no-llm`
+  composer. The agentic digest is the capability suite's business and the
+  capability suite never gates; run it with
+  `bin/aubade-lab eval --capability` (a loud SKIP when claude is absent) or
+  `make check-agentic`.
+- **Nothing about how the page reads.** The code graders answer "is the finding
+  there and is it cited". "Does it read like the sample, in Avery's voice" is
+  the judge's question, and the judge informs rather than blocks.
+- **Nothing about a corpus other than the pinned one.** Seed 42 at
+  `--today 2026-08-30` is one exam. Dataset mutation testing — perturb the dates
+  and senders, the traps must still be caught — is explicitly week two.
+- **The score can be right for the wrong reason.** The graders assert outcomes,
+  not paths (EVAL-PRINCIPLES #6): a trap surfaced by an extractor other than the
+  one the answer key expected still passes, and the mismatch is printed rather
+  than failed. What closes that hole is sabotage, which is asserted for all
+  seven extractors in `go test` and available on demand per extractor.
 
-Why it exits 0: the pre-commit hook is installed from bead A2 onward, so an e2e
-that failed before the engine existed would make it impossible to commit the
-engine. The stub is deliberately *loud* rather than silent — a check that is not
-yet running has to say so on every run, or the gate quietly becomes theatre and
-someone eventually cites it as proof of something it never checked.
-
-So today, a green `make check` proves: **it compiles, it vets, and the unit tests
-pass** — including the toolbox's own trap-shaped tests over its hand-written
-fixtures, the generator's tests over the full 500-email corpus (size,
-distribution, "same seed, byte-identical output", and the invariants that keep
-the filler from planting findings of its own), and the digest composer's golden
-pages over its own two pinned corpora.
-
-What a green gate still does **not** prove is the one thing the assignment
-actually grades: that a digest built from the *generated* corpus catches the
-planted traps. Each stage is verified against fixtures its own author chose —
-the exam (B3) and the student (C1/C2) are still graded separately, and the eval
-that joins them is bead D1's. So green says every stage does the same thing
-today that it did yesterday, over fixtures we wrote; it does not yet say the
-answers are right.
-
-Bead D1 replaces the stub body with the real scenario (SPEC "End-to-end
-verification scenario") and the script starts failing the gate on any regression
-miss:
-
-```
-bin/aubade-lab generate --seed 42 --today 2026-08-30 --out data/
-bin/aubade digest --no-llm --out out/
-bin/aubade-lab eval --out out/          # non-zero exit on any regression miss
-```
+**Observed, not assumed.** Before the D1 commit the gate was watched failing:
+`Conflicts()` was stubbed to return nothing, and `make e2e` went red naming both
+calendar tasks, the extractor that missed them, and the reason. A gate nobody
+has watched fail is a gate nobody knows works.
 
 ### 3.2 Deliberately outside the gate, permanently
 
 | Not gated | Why |
 |---|---|
-| **Capability suite** (agentic digest, N=3 trials, `pass^3` / `pass@3`) | Non-deterministic and needs a model runner. Runs locally when the claude CLI is present, with a loud SKIP otherwise — never a silent one. |
+| **Capability suite** (`aubade-lab eval --capability`: agentic digest, N=3 isolated trials in `out/trial-N/`, `pass^3` / `pass@3`) | Non-deterministic and needs a model runner. Runs when the claude CLI is present, with a loud SKIP otherwise — never a silent one — and it never touches the exit code either way. Observed on 2026-08-30 against claude 2.1.251: 3/3 trials composed agentically, 20/20 tasks at pass^3, every citation on every page grounded in that trial's own `signals.json`. |
 | **`make check-agentic`** (`scripts/agentic-e2e.sh`) | The live agentic digest against the real claude CLI: two model-driven runs over the seeded corpus. It proves what no unit test can — that claude accepts the flags aubade hands it on the version installed here, that the allowlisted loop really calls `aubade tool`, that the composed page survived aubade's own citation check, and that `--customize` reshaped the page while the honesty floor stayed on it. Skips **loudly** when claude is absent, with a banner saying the agentic digest is unverified on this machine. |
-| **Sabotage runs** (`aubade-lab eval --sabotage=<extractor>`) | On-demand and periodic. It proves the *graders* can see (score must drop when an extractor is disabled); it is a check on the exam, not on the commit. |
-| **Judge grader** (`aubade-lab eval --judge`) | Model-scored voice/readability. Layer 2, by definition not binary, so it informs but never blocks. |
+| **Sabotage runs** (`aubade-lab eval --sabotage=<extractor>`) | On-demand and periodic. It proves the *graders* can see: the score must drop when an extractor is disabled, and an ALARM (banner plus non-zero exit) says it did not. A check on the exam, not on the commit — a gate that goes red because a deliberately broken engine scored badly teaches people to ignore the gate. Observed drops on the pinned corpus: commitments −1, quiet-threads −4, conflicts −3, contradictions −1, dispatchables −2, suppressions −1, staleness −1. |
+| **Judge grader** (`aubade-lab eval --judge`) | Model-scored voice/readability. Layer 2, by definition not binary, so it informs but never blocks. It judges the agentic trial when the capability suite ran and the deterministic page otherwise, and says which on the card. Observed on 2026-08-30: it graded the `--no-llm` page `reads-like-a-machine` — evidence the anchors discriminate rather than sitting at the top. |
 | **`make fmt-check`** | Advisory. Formatting noise should not be able to block a correctness fix. |
 | **Learning tests** (`learning-tests/`) | They drive the real claude and codex CLIs: cost, auth, and non-determinism — three separate disqualifications. See §3.4. |
 
@@ -222,10 +251,14 @@ cannot reach the honesty layer either — the banner, contradictions and "I'm no
 sure" are appended by aubade from the signals after the composer is done, so a
 prompt that asks for them to go away simply does not get them removed.
 
-The remaining stubs still exit 1 with `not implemented yet (bead X)` and name
-the bead that will build them: `aubade schedule` (E1) and `aubade-lab eval`
-(D1). Stubs exit **non-zero** on purpose — a stub that exits 0 lets a gate go
-green over an empty binary.
+`aubade-lab eval` is real as of bead D1: it loads `traps.json`, grades
+`out/digest.md` against the `out/signals.json` beside it, writes
+`out/scorecard.md` with the regression and capability sections kept apart, and
+exits non-zero on any regression miss or sabotage alarm.
+
+One stub is left, and it exits 1 with `not implemented yet (bead E1)` naming the
+bead that will build it: `aubade schedule`. Stubs exit **non-zero** on purpose —
+a stub that exits 0 lets a gate go green over an empty binary.
 
 ### 3.4 Learning tests — the dependencies the gate cannot touch
 
@@ -335,13 +368,15 @@ SageOx hook (which was preserved, not replaced).
 - **`check`** — on `pull_request` and pushes to `main`. `actions/checkout@v4`,
   `actions/setup-go@v5` (Go `1.26.x`), then `make check`. Same target as the local
   hook: CI and the laptop cannot disagree about what green means.
-  Uploads `out/digest.md` and `out/scorecard.md` as artifacts with
-  `if-no-files-found: ignore`, because until D1 neither file is produced and a
-  missing artifact must not turn the gate red.
-- **`capability-eval`** — `workflow_dispatch` only. Today it echoes
-  `capability suite runs locally; wired in bead D1`; it is a documented
-  placeholder. It stays manual permanently: the capability suite is
-  non-deterministic and never gates a pull request.
+  Uploads `out/digest.md` and `out/scorecard.md` as artifacts — both are now
+  written by the e2e run, so a failed gate leaves the scorecard that explains it
+  attached to the run.
+- **`capability-eval`** — `workflow_dispatch` only, and it stays manual
+  permanently: the capability suite is non-deterministic and never gates a pull
+  request. It runs the pipeline and then `aubade-lab eval --capability
+  --sabotage=<extractor>`; without a claude CLI on the runner the capability half
+  skips loudly and the sabotage half still runs, which is the useful part to have
+  on a button.
 
 ---
 
@@ -353,12 +388,35 @@ make check                   # the gate
 make build && ./bin/aubade --help
 ```
 
+The passes that are deliberately outside the gate, in the order you would reach
+for them:
+
+```
+bin/aubade-lab eval --adversarial            # how each negative task stayed out
+bin/aubade-lab eval --sabotage=conflicts     # can the graders still see? (non-zero on ALARM)
+bin/aubade-lab eval --capability             # agentic, N=3 trials, pass^3 / pass@3
+bin/aubade-lab eval --judge                  # layer 2: does it read like the sample
+make check-agentic                           # the live agentic digest, end to end
+```
+
+All four read the run in `out/`, so produce one first (`make e2e`, or the two
+commands it runs). The last three need the claude CLI and say so loudly when it
+is missing.
+
 To watch the gate block, rather than trusting that it would:
 
 ```
 printf 'package cli\n\nfunc broken() { this is not go }\n' > internal/cli/tmp_break.go
 git add internal/cli/tmp_break.go && git commit -m "should be refused"   # exits 1
 git reset -q internal/cli/tmp_break.go && rm internal/cli/tmp_break.go
+```
+
+To watch the *eval* block, which is the half that is new:
+
+```
+make e2e                                     # green
+printf '# Daily Digest — nothing to report.\n' > out/digest.md
+bin/aubade-lab eval                          # RED, naming every task and the extractor that owes it
 ```
 
 ## 7 · Provenance of this gate

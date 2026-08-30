@@ -62,9 +62,15 @@ e2e: build
 	@./scripts/e2e-regression.sh
 
 ## golden: rewrite the committed golden digests (do this deliberately, then read the diff).
+#
+# Two sets, and they answer different questions. internal/digest's goldens pin
+# the composer against its own two fixture corpora. internal/eval's reference
+# digest pins the answer to the *generated* exam, and is what proves every
+# planted trap is catchable before an agent is blamed for missing one.
 golden:
 	@printf '\033[1m==> regenerating golden digests\033[0m\n'
 	$(GO) test ./internal/digest -run TestGoldenDigests -update
+	$(GO) test ./internal/eval -run TestReferenceDigestMatchesGolden -update
 	@printf '    review the diff: a golden that changed by accident is a regression\n'
 
 ## fmt: rewrite sources with gofmt.
