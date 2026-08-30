@@ -105,6 +105,7 @@ bin/aubade-lab eval --out out/          # non-zero exit on any regression miss
 | **Sabotage runs** (`aubade-lab eval --sabotage=<extractor>`) | On-demand and periodic. It proves the *graders* can see (score must drop when an extractor is disabled); it is a check on the exam, not on the commit. |
 | **Judge grader** (`aubade-lab eval --judge`) | Model-scored voice/readability. Layer 2, by definition not binary, so it informs but never blocks. |
 | **`make fmt-check`** | Advisory. Formatting noise should not be able to block a correctness fix. |
+| **Learning tests** (`learning-tests/`) | They drive the real claude and codex CLIs: cost, auth, and non-determinism — three separate disqualifications. See §3.4. |
 
 ### 3.3 Currently stubbed commands
 
@@ -112,6 +113,40 @@ Every subcommand of both binaries exits 1 with `not implemented yet (bead X)` an
 names the bead that will build it: B1 generator, C1 toolbox, C2 digest, D1 eval,
 E1 scheduling design. Stubs exit **non-zero** on purpose — a stub that exits 0
 lets a gate go green over an empty binary.
+
+### 3.4 Learning tests — the dependencies the gate cannot touch
+
+`make check` says nothing about the claude CLI, the codex CLI, or what agent
+detection does against a real environment, because none of those can be asserted
+deterministically without a key and a network. `learning-tests/` covers them,
+outside the gate, run by hand:
+
+```
+bash learning-tests/run-all.sh
+```
+
+Each script writes down the assumption it started with, runs the real binary,
+and asserts the result — correcting its own header comment where reality
+disagreed. Exit codes are three-valued: 0 CONFIRMED, 1 CONTRADICTED (a header
+comment is now wrong), 2 INCONCLUSIVE (dependency absent, unauthenticated, or
+over the 90s budget). A timeout is a finding, not a failure.
+
+What they establish today, in one line each — details and consequences in
+`learning-tests/README.md`:
+
+- The consensus roster on this machine is **one** runner, not three: gemini is
+  absent, and codex is installed and reports itself logged in while `codex exec`
+  returns 401. Presence is not liveness.
+- claude's `--json-schema` takes inline JSON, codex's `--output-schema` takes a
+  file; claude's `.result` is a JSON string requiring a second decode.
+- There is no `--max-turns` on the claude CLI — bounded turns is aubade's job.
+- A headless `claude -p` obeys the CLAUDE.md of its cwd; `--setting-sources
+  user` is what keeps a stranger's instruction file out of the digest.
+- `--allowedTools` alone is a real boundary: unallowlisted calls are denied, so
+  the toolbox is enforced rather than merely intended.
+- Agent detection is live and correct in both directions, including nested
+  under a claude-driven tool loop — where `aubade tool` returns JSON with no
+  `--json` flag.
 
 ---
 
