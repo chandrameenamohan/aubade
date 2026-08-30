@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,21 +113,6 @@ func TestDigestSpeaksJSONToAnAgentCaller(t *testing.T) {
 	}
 	if payload.Path == "" || payload.Signals == "" {
 		t.Error("the envelope should name both files it wrote")
-	}
-}
-
-// Agentic mode is not built. It says so and names its bead rather than quietly
-// composing the page some other way.
-func TestDigestWithoutNoLLMIsAnHonestStub(t *testing.T) {
-	_, args := digestArgs(t, "digest")
-
-	_, err := run(NewAubadeCmd(), args...)
-	var se *StubError
-	if !errors.As(err, &se) {
-		t.Fatalf("expected a *StubError, got %T (%v)", err, err)
-	}
-	if !strings.Contains(se.Error(), "--no-llm") {
-		t.Errorf("the stub should point at the mode that does work: %q", se.Error())
 	}
 }
 

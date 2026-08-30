@@ -14,13 +14,22 @@ PKGS    := ./...
 BINARIES := aubade aubade-lab
 
 .DEFAULT_GOAL := check
-.PHONY: all check vet build build-all test e2e golden clean fmt fmt-check hooks help
+.PHONY: all check check-agentic vet build build-all test e2e golden clean fmt fmt-check hooks help
 
 all: build
 
 ## check: the gate — vet, build, unit tests, then the end-to-end regression run.
 check: vet build-all test e2e
 	@printf '\n\033[32m==> make check: GREEN\033[0m\n'
+
+## check-agentic: the live agentic digest (needs the claude CLI). NOT in `check`.
+#
+# Deliberately outside the gate: it calls a real model, so it costs money, needs
+# auth, and is non-deterministic — and non-deterministic checks never gate
+# (VERIFICATION.md §2). It skips loudly when claude is absent rather than
+# passing quietly.
+check-agentic: build
+	@./scripts/agentic-e2e.sh
 
 ## vet: static analysis over every package.
 vet:
