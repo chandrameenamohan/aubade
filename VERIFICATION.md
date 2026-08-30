@@ -54,6 +54,14 @@ API keys and no network beyond the Go module cache:
   menu, argument validation, and the JSON-vs-prose error envelope. These are
   asserted because the eval harness and every agent caller bind to them; a
   silently renamed flag is a silently broken integration.
+- **The trap catalog** (`internal/datagen`) — because each trap emits both its
+  artifacts and its own answer-key entry, the tests assert things a hand-written
+  `traps.json` could only promise: every extractor in `model.KnownKinds` has at
+  least one task behind it, every `planted_ref` resolves to an artifact some
+  scenario actually wrote, every keyword a trap will be graded on is quotable
+  from that trap's own cited evidence, no reply predates the message it answers,
+  and the same `(seed, --today)` produces a byte-identical plan. What it does
+  *not* assert is that anything finds those traps — nothing extracts yet.
 - **The end-to-end regression scenario** (once bead D1 lands) — `aubade-lab generate`
   is seeded, `aubade digest --no-llm` runs a fixed extractor order over that fixed
   corpus, and `aubade-lab eval` asserts each planted trap present and each negative
