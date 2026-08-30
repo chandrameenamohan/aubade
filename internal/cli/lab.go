@@ -60,15 +60,15 @@ Seeded and reproducible: the same --seed produces byte-identical output, which i
 what lets a committed golden digest mean anything. Dates anchor to --today so the
 dataset stays evergreen rather than rotting into last year.`),
 		Args: cobra.NoArgs,
-		RunE: stub("B1", "scenario-script generator emitting the corpus and its own answer key"),
+		RunE: func(c *cobra.Command, _ []string) error { return runGenerate(c) },
 	}
 
 	f := c.Flags()
 	f.Int("seed", 42, "PRNG seed; same seed produces byte-identical output")
 	f.String("today", "", "anchor date, YYYY-MM-DD (default: system date, America/Los_Angeles)")
-	f.String("out", "data/", "directory to write the corpus and traps.json into")
+	f.String("out", defaultDataDir, "directory to write the corpus and traps.json into")
+	f.Bool("json", false, "emit the run receipt as JSON (default when an AI agent caller is detected)")
 
-	annotate(c, "B1")
 	return c
 }
 

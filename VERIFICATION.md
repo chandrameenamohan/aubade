@@ -127,12 +127,18 @@ someone eventually cites it as proof of something it never checked.
 
 So today, a green `make check` proves: **it compiles, it vets, and the unit tests
 pass** — including the toolbox's own trap-shaped tests over its hand-written
-fixtures, and the digest composer's golden pages over its own. What it still
-does not prove is that a digest built from the *generated* corpus catches the
-planted traps: that corpus is bead B1's, and the eval that joins the exam to the
-student is bead D1's. A green gate says the composer does the same thing today
-that it did yesterday, over fixtures we wrote; it does not yet say the answers
-are right.
+fixtures, the generator's tests over the full 500-email corpus (size,
+distribution, "same seed, byte-identical output", and the invariants that keep
+the filler from planting findings of its own), and the digest composer's golden
+pages over its own two pinned corpora.
+
+What a green gate still does **not** prove is the one thing the assignment
+actually grades: that a digest built from the *generated* corpus catches the
+planted traps. Each stage is verified against fixtures its own author chose —
+the exam (B3) and the student (C1/C2) are still graded separately, and the eval
+that joins them is bead D1's. So green says every stage does the same thing
+today that it did yesterday, over fixtures we wrote; it does not yet say the
+answers are right.
 
 Bead D1 replaces the stub body with the real scenario (SPEC "End-to-end
 verification scenario") and the script starts failing the gate on any regression
@@ -158,9 +164,12 @@ bin/aubade-lab eval --out out/          # non-zero exit on any regression miss
 
 `aubade tool` and `aubade signals` are real as of bead C1: they load a corpus,
 run the extractors, and emit cited signals (`aubade signals` writes
-`out/signals.json`). `aubade digest --no-llm` is real as of bead C2: it composes
-the full one-pager from those signals and writes `out/digest.md` with
-`out/signals.json` beside it, with no network and no keys.
+`out/signals.json`). `aubade-lab generate` is real as of bead B3: it writes the
+whole corpus — `inbox.jsonl`, `calendar.ics`, `notes/`, `tasks.md`, `profile.md`
+and `traps.json` — and the same `(seed, --today)` produces byte-identical files.
+`aubade digest --no-llm` is real as of bead C2: it composes the full one-pager
+from those signals and writes `out/digest.md` with `out/signals.json` beside it,
+with no network and no keys.
 
 `aubade digest` **without** `--no-llm` — agentic mode — still exits 1 and names
 its bead (C3), and it does not fall back to the template. Composing the page a
@@ -170,9 +179,9 @@ the same reason: customization reshapes the compose stage, and `--no-llm` has no
 compose stage to reshape.
 
 The remaining stubs still exit 1 with `not implemented yet (bead X)` and name
-the bead that will build them: `aubade schedule` (E1), `aubade-lab generate`
-(B1), `aubade-lab eval` (D1). Stubs exit **non-zero** on purpose — a stub that
-exits 0 lets a gate go green over an empty binary.
+the bead that will build them: `aubade schedule` (E1) and `aubade-lab eval`
+(D1). Stubs exit **non-zero** on purpose — a stub that exits 0 lets a gate go
+green over an empty binary.
 
 ### 3.4 Learning tests — the dependencies the gate cannot touch
 
