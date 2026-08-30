@@ -214,7 +214,7 @@ has watched fail is a gate nobody knows works.
 | **`make fmt-check`** | Advisory. Formatting noise should not be able to block a correctness fix. |
 | **Learning tests** (`learning-tests/`) | They drive the real claude and codex CLIs: cost, auth, and non-determinism — three separate disqualifications. See §3.4. |
 
-### 3.3 Currently stubbed commands
+### 3.3 What each command actually does now (no stubs left)
 
 `aubade tool` and `aubade signals` are real as of bead C1: they load a corpus,
 run the extractors, and emit cited signals (`aubade signals` writes
@@ -256,9 +256,21 @@ prompt that asks for them to go away simply does not get them removed.
 `out/scorecard.md` with the regression and capability sections kept apart, and
 exits non-zero on any regression miss or sabotage alarm.
 
-One stub is left, and it exits 1 with `not implemented yet (bead E1)` naming the
-bead that will build it: `aubade schedule`. Stubs exit **non-zero** on purpose —
-a stub that exits 0 lets a gate go green over an empty binary.
+`aubade schedule --design` is real as of bead D3, and it was the last stub: it
+prints the scheduling design, which is embedded in the binary
+(`internal/cli/schedule_design.md`) so a shipped aubade can answer the question
+with no repo checked out. The same text is DESIGN.md's scheduling section, and a
+test fails the moment the two disagree — the same drift discipline the golden
+digests get. `aubade schedule` **without** `--design` scheduled nothing, so it
+exits non-zero saying so rather than printing a document and exiting 0: to an
+agent, a zero exit reads as "the job is scheduled".
+
+With that, no command in either tree is a stub, and the scaffolding that
+announced stubs — a `StubError` naming the bead that would land it, rendered as
+a `not_implemented` envelope for agent callers — went with it. Stubs exited
+**non-zero** on purpose (a stub that exits 0 lets a gate go green over an empty
+binary); `TestNoCommandIsAStub` is what now keeps one from coming back
+unnoticed.
 
 ### 3.4 Learning tests — the dependencies the gate cannot touch
 
@@ -377,6 +389,21 @@ SageOx hook (which was preserved, not replaced).
   --sabotage=<extractor>`; without a claude CLI on the runner the capability half
   skips loudly and the sabotage half still runs, which is the useful part to have
   on a button.
+
+**Branch protection is unavailable here, and that is a real gap rather than an
+oversight.** Protected branches — "require status checks to pass before merging"
+— need a public repository or a paid plan, and this one is private on the free
+plan. GitHub will therefore accept a merge with `check` red, and nothing at the
+server end will stop it. The rule is consequently procedural, and written down
+here so it can be audited rather than assumed: **no bead's pull request is merged
+until `gh pr checks --watch` reports the `check` job green.** Two things make
+that less fragile than it sounds — the pre-commit hook runs the identical
+`make check` before the commit exists at all, so a red pull request is already an
+unusual event, and the merge is a deliberate act by someone with the run in front
+of them. It is still weaker than a server-side gate. Making the repository
+public, or moving it to a plan with protected branches, closes the gap in one
+setting; until then, merging without a green `gh pr checks` belongs in the same
+category as `git commit --no-verify`.
 
 ---
 
