@@ -108,9 +108,11 @@ someone eventually cites it as proof of something it never checked.
 
 So today, a green `make check` proves: **it compiles, it vets, and the unit tests
 pass** — including the toolbox's own trap-shaped tests over its hand-written
-fixtures. It does not yet prove any *digest* is correct, because no digest exists,
-and it does not prove the extractors behave on the generated 500-email corpus,
-because that corpus is bead B1's and the eval that grades it is bead D1's.
+fixtures, and the generator's tests over the full 500-email corpus (size,
+distribution, "same seed, byte-identical output", and the invariants that keep
+the filler from planting findings of its own). It does not yet prove any
+*digest* is correct, because no digest exists, and it does not prove the
+extractors behave on that corpus, because the eval that grades them is bead D1's.
 
 Bead D1 replaces the stub body with the real scenario (SPEC "End-to-end
 verification scenario") and the script starts failing the gate on any regression
@@ -136,10 +138,13 @@ bin/aubade-lab eval --out out/          # non-zero exit on any regression miss
 
 `aubade tool` and `aubade signals` are real as of bead C1: they load a corpus,
 run the extractors, and emit cited signals (`aubade signals` writes
-`out/signals.json`). The rest still exit 1 with `not implemented yet (bead X)`
-and name the bead that will build them: `aubade digest` (C2), `aubade schedule`
-(E1), `aubade-lab generate` (B1), `aubade-lab eval` (D1). Stubs exit **non-zero**
-on purpose — a stub that exits 0 lets a gate go green over an empty binary.
+`out/signals.json`). `aubade-lab generate` is real as of bead B3: it writes the
+whole corpus — `inbox.jsonl`, `calendar.ics`, `notes/`, `tasks.md`, `profile.md`
+and `traps.json` — and the same seed produces byte-identical files. The rest
+still exit 1 with `not implemented yet (bead X)` and name the bead that will
+build them: `aubade digest` (C2), `aubade schedule` (E1), `aubade-lab eval`
+(D1). Stubs exit **non-zero** on purpose — a stub that exits 0 lets a gate go
+green over an empty binary.
 
 ### 3.4 Learning tests — the dependencies the gate cannot touch
 

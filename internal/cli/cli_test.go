@@ -87,7 +87,6 @@ func TestStubsFailAndNameTheirBead(t *testing.T) {
 		{NewAubadeCmd(), []string{"digest"}},
 		{NewAubadeCmd(), []string{"digest", "--no-llm"}},
 		{NewAubadeCmd(), []string{"schedule", "--design"}},
-		{NewLabCmd(), []string{"generate", "--seed", "42"}},
 		{NewLabCmd(), []string{"eval", "--judge"}},
 	}
 
