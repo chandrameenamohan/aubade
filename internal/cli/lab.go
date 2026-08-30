@@ -29,6 +29,7 @@ Examples:
   aubade-lab generate --seed 42 --today 2026-08-30 --out data/
   aubade-lab eval                             regression suite, exits non-zero on a miss
   aubade-lab eval --sabotage=commitments      disable one extractor; alarm if the score holds
+  aubade-lab eval --adversarial               let a model write traps we didn't, on a copy
   aubade-lab eval --judge                     add the layer-2 voice/readability judge`
 
 // NewLabCmd builds the internal harness command tree. Nothing here ships to a
@@ -100,8 +101,13 @@ the meeting it was told not to make a fuss about.
   --judge       add the layer-2 model judge for the one axis code cannot grade —
                 "does this read like the sample, in the user's voice" — anchored,
                 reason-before-score, with an "uncertain" escape hatch.
-  --adversarial report how each negative trap stayed out: the rule that held it
-                back, or the fact that nothing ever looked at it.`),
+  --negatives   report how each negative trap stayed out: the rule that held it
+                back, or the fact that nothing ever looked at it.
+  --adversarial have a model author new traps this repository did not write,
+                inject them into a COPY of the corpus, and re-run the harness
+                over the copy. The original dataset is never written to, and a
+                miss never touches the exit code: these tasks did not exist
+                before the run, so they are coverage news, not a regression.`),
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error { return runEval(c) },
 	}

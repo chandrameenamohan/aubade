@@ -47,7 +47,7 @@ func TestAubadeSurface(t *testing.T) {
 func TestLabSurface(t *testing.T) {
 	wantCmds := map[string][]string{
 		"generate": {"seed", "today", "out"},
-		"eval":     {"sabotage", "judge", "adversarial", "out"},
+		"eval":     {"sabotage", "judge", "negatives", "adversarial", "out"},
 	}
 
 	root := NewLabCmd()

@@ -37,15 +37,17 @@ type Card struct {
 	// Grounding is the transcript check over the regression page.
 	Grounding Grounding
 
-	// Capability, Sabotage and Judge are the on-demand passes, nil when they
-	// did not run at all. A capability suite that ran and skipped is non-nil
-	// and Skipped — a different thing, and it prints differently.
-	Capability *Capability
-	Sabotage   *Sabotage
-	Judge      *Judgment
+	// Capability, Sabotage, Judge and Adversarial are the on-demand passes, nil
+	// when they did not run at all. A pass that ran and skipped is non-nil and
+	// Skipped — a different thing, and it prints differently.
+	Capability  *Capability
+	Sabotage    *Sabotage
+	Judge       *Judgment
+	Adversarial *Adversarial
 
-	// Adversarial turns on the detailed negative-half report.
-	Adversarial bool
+	// Negatives turns on the detailed report of how each negative task stayed
+	// out.
+	Negatives bool
 }
 
 // Markdown renders the whole card.
@@ -59,6 +61,7 @@ func (c *Card) Markdown() string {
 	c.writeRegression(&b)
 	c.writeGrounding(&b)
 	c.writeCapability(&b)
+	c.writeAdversarial(&b)
 	c.writeSabotage(&b)
 	c.writeJudge(&b)
 
@@ -98,20 +101,20 @@ func (c *Card) writeRegression(b *strings.Builder) {
 		b.WriteString("\n")
 	}
 
-	if c.Adversarial {
-		c.writeAdversarial(b)
+	if c.Negatives {
+		c.writeNegatives(b)
 	}
 }
 
-// writeAdversarial spells out how each negative task stayed out.
+// writeNegatives spells out how each negative task stayed out.
 //
 // The pass/fail bar does not move: a negative task passes when nothing claimed
 // it. What this adds is the *reason*, and the reason is the interesting part —
 // "held back on the user's own rule" is the suppression layer working, while
 // "no extractor claimed it" is a pass the engine got for free and would keep
 // getting if the rule were deleted tomorrow.
-func (c *Card) writeAdversarial(b *strings.Builder) {
-	b.WriteString("\n### Adversarial pass — how the negative half stayed out\n\n")
+func (c *Card) writeNegatives(b *strings.Builder) {
+	b.WriteString("\n### Negative half — how each suppressed task stayed out\n\n")
 	b.WriteString("| Task | Owning extractor | Held back by | Evidence |\n|---|---|---|---|\n")
 	for _, r := range c.Regression.Traps {
 		if r.MustSurface {
@@ -202,6 +205,93 @@ func (c *Card) writeCapability(b *strings.Builder) {
 	b.WriteString("\n")
 }
 
+// writeAdversarial reports the traps this repository did not write.
+//
+// It is a capability section and it says so twice — in the banner and in the
+// exit-code note — because a "2/3 caught" line sitting under a green regression
+// table is exactly the shape of number someone quotes as a failure. The tasks
+// did not exist before this run, they will be different next run, and a miss is
+// coverage news rather than a regression.
+func (c *Card) writeAdversarial(b *strings.Builder) {
+	if c.Adversarial == nil {
+		return
+	}
+	a := c.Adversarial
+	b.WriteString("## Adversarial suite — traps we did not write\n\n")
+	b.WriteString("A model is shown the corpus, the profile and the existing catalog, and asked\n")
+	b.WriteString("for situations that are *not* in it. The new tasks are injected into a copy of\n")
+	b.WriteString("the dataset — the original is never written to — and the deterministic harness\n")
+	b.WriteString("is re-run over the copy. Non-deterministic by construction, so a miss here is\n")
+	b.WriteString("coverage news and never an exit code.\n\n")
+
+	if a.Skipped {
+		b.WriteString("> **SKIPPED — no new traps were authored.**\n>\n")
+		fmt.Fprintf(b, "> %s\n>\n", a.SkipReason)
+		b.WriteString("> This is a skip, not a pass. Nothing below was measured.\n\n")
+		return
+	}
+	fmt.Fprintf(b, "Author: `%s`, asked for %d scenario(s) over %d attempt(s).\n\n", a.Author, a.Want, a.Attempts)
+
+	if a.Err != nil {
+		fmt.Fprintf(b, "**The run produced no grade:** %s\n\n", cell(a.Err.Error()))
+		writeRejections(b, a.Rejections)
+		return
+	}
+
+	caught, total := a.Caught()
+	fmt.Fprintf(b, "**%d/%d authored tasks caught.** Injected copy: `%s`\n\n", caught, total, a.Dir)
+
+	b.WriteString("| Task | Kind | Must surface | Expected | Caught | Evidence |\n")
+	b.WriteString("|---|---|---|---|---|---|\n")
+	for _, r := range a.Result.Traps {
+		fmt.Fprintf(b, "| `%s` | %s | %s | `%s` | %s | %s |\n",
+			r.ID, r.Kind, yesNo(r.MustSurface), r.Expected, caughtMissed(r.Passed), cell(r.Reason))
+	}
+	b.WriteString("\n")
+
+	for _, t := range a.Traps {
+		fmt.Fprintf(b, "- **%s** — %s\n", t.ID, cell(t.Description))
+	}
+	b.WriteString("\n")
+
+	writeControl(b, a.Control)
+	writeRejections(b, a.Rejections)
+}
+
+// writeControl reports the original answer key re-graded over the injected
+// page. It is the check that keeps a miss honest: if injecting three new
+// scenarios knocked over a planted trap, the corpus moved under the exam and
+// the adversarial numbers are about the injection rather than about the engine.
+func writeControl(b *strings.Builder, control *Result) {
+	if control == nil {
+		return
+	}
+	passed, total := control.Score()
+	if passed == total {
+		fmt.Fprintf(b, "Control: the %d planted tasks still pass over the injected corpus, so the new\ntasks are the only thing that changed.\n\n", total)
+		return
+	}
+	fmt.Fprintf(b, "**Control: %d/%d planted tasks still pass over the injected corpus.** The\ninjection disturbed the exam, so read the misses above with that in mind:\n\n", passed, total)
+	for _, f := range control.Failures() {
+		fmt.Fprintf(b, "- `%s` — %s\n", f.ID, cell(f.Reason))
+	}
+	b.WriteString("\n")
+}
+
+// writeRejections lists what the contract threw out. A rejected scenario is a
+// finding about the schema and the prompt rather than about the engine, and it
+// is the first thing to read when the suite authored nothing.
+func writeRejections(b *strings.Builder, rejections []Rejection) {
+	if len(rejections) == 0 {
+		return
+	}
+	b.WriteString("### Rejected by the contract\n\n")
+	for _, r := range rejections {
+		fmt.Fprintf(b, "- attempt %d, `%s` — %s\n", r.Attempt, r.ID, cell(r.Reason))
+	}
+	b.WriteString("\n")
+}
+
 func (c *Card) writeSabotage(b *strings.Builder) {
 	if c.Sabotage == nil {
 		return
@@ -279,6 +369,16 @@ func verdict(passed bool) string {
 		return "PASS"
 	}
 	return "**FAIL**"
+}
+
+// caughtMissed is the adversarial table's verdict column. It deliberately does
+// not say PASS/FAIL: those words belong to a suite with a bar, and this one has
+// none.
+func caughtMissed(passed bool) string {
+	if passed {
+		return "caught"
+	}
+	return "**missed**"
 }
 
 func yesNo(b bool) string {

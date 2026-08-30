@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/chandrameenamohan/aubade/internal/eval"
 	"github.com/chandrameenamohan/aubade/internal/extract"
 	"github.com/chandrameenamohan/aubade/internal/model"
+	"github.com/chandrameenamohan/aubade/internal/runner/runnertest"
 )
 
 // What is under test here is the harness's wiring: what it reads, what it
@@ -265,22 +267,90 @@ func TestEvalCapabilitySkipsLoudlyWithoutARunner(t *testing.T) {
 	}
 }
 
-// The adversarial pass adds evidence, never a different bar: it says how each
+// The negative-half pass adds evidence, never a different bar: it says how each
 // negative task stayed out.
-func TestEvalAdversarialReportsHowNegativesStayedOut(t *testing.T) {
+func TestEvalNegativesReportsHowNegativesStayedOut(t *testing.T) {
 	t.Setenv("AUBADE_OUTPUT", "human")
+	data, out := evalCorpus(t)
+
+	stdout, err := run(NewLabCmd(), "eval", "--data", data, "--today", corpusDay, "--out", out, "--negatives")
+	if err != nil {
+		t.Fatalf("eval --negatives: %v\n%s", err, stdout)
+	}
+	for _, want := range []string{"Negative half", "Held back by", "negative-newsletter-stratechery"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("the negative-half section is missing %q", want)
+		}
+	}
+}
+
+// The adversarial suite needs a model, and a machine without one gets a skip
+// rather than a silence — and never an exit code.
+func TestEvalAdversarialSkipsLoudlyWithNoRunner(t *testing.T) {
+	t.Setenv("AUBADE_OUTPUT", "human")
+	withRunners(t, &runnertest.Runner{RunnerName: "claude", Missing: true})
 	data, out := evalCorpus(t)
 
 	stdout, err := run(NewLabCmd(), "eval", "--data", data, "--today", corpusDay, "--out", out, "--adversarial")
 	if err != nil {
-		t.Fatalf("eval --adversarial: %v\n%s", err, stdout)
+		t.Fatalf("a skipped adversarial suite must not fail the run: %v\n%s", err, stdout)
 	}
-	for _, want := range []string{"Adversarial pass", "Held back by", "negative-newsletter-stratechery"} {
+	for _, want := range []string{"Adversarial suite", "SKIPPED", "This is a skip, not a pass"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("the skip is not loud enough; missing %q", want)
+		}
+	}
+}
+
+// The whole wiring, end to end through the command: a scripted author writes a
+// trap, it lands in a copy under --out, the original corpus is untouched, and a
+// missed adversarial task never reaches the exit code.
+func TestEvalAdversarialInjectsIntoACopyAndNeverGates(t *testing.T) {
+	t.Setenv("AUBADE_OUTPUT", "human")
+	withRunners(t, &runnertest.Runner{RunnerName: "claude", Answers: []string{impossibleScenario}})
+	data, out := evalCorpus(t)
+
+	inbox := filepath.Join(data, "inbox.jsonl")
+	before, err := os.ReadFile(inbox)
+	if err != nil {
+		t.Fatalf("cannot read the corpus inbox: %v", err)
+	}
+
+	stdout, err := run(NewLabCmd(), "eval", "--data", data, "--today", corpusDay, "--out", out, "--adversarial")
+	if err != nil {
+		t.Fatalf("an adversarial miss must not fail the run: %v\n%s", err, stdout)
+	}
+	for _, want := range []string{"Adversarial suite", "adv-unfindable", "**missed**"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("the adversarial section is missing %q", want)
 		}
 	}
+
+	after, err := os.ReadFile(inbox)
+	if err != nil {
+		t.Fatalf("cannot re-read the corpus inbox: %v", err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Error("the adversarial run wrote into the original corpus")
+	}
+	copied := filepath.Join(out, eval.AdversarialDir, "data", "inbox.jsonl")
+	if _, err := os.Stat(copied); err != nil {
+		t.Errorf("the injected copy is not under --out: %v", err)
+	}
 }
+
+// A trap whose evidence nothing in the engine looks for: the author planted it,
+// the contract accepted it, and the deterministic page will not carry it. That
+// is a miss, and a miss here is coverage news rather than a red gate.
+const impossibleScenario = `{"scenarios":[{
+"id":"adv-unfindable",
+"kind":"fyi-only",
+"description":"A note nobody asked for, filed under a heading the digest has no section for.",
+"must_surface":true,
+"expect":{"signal_kind":"staleness","keywords":["quarterly hedgerow audit"]},
+"emails":[],"events":[],"tasks":[],
+"notes":[{"path":"notes/adv-hedgerow.md","title":"Hedgerow audit","day_offset":-3,
+"body":"The quarterly hedgerow audit is filed and needs nothing from anyone."}]}]}`
 
 // The transcript filename is a contract between the digest that writes it and
 // the harness that reads it. Two constants, one meaning.

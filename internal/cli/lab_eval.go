@@ -13,6 +13,7 @@ import (
 	"github.com/chandrameenamohan/aubade/internal/extract"
 	"github.com/chandrameenamohan/aubade/internal/localfs"
 	"github.com/chandrameenamohan/aubade/internal/model"
+	"github.com/chandrameenamohan/aubade/internal/runner"
 	"github.com/chandrameenamohan/aubade/styles"
 	"github.com/spf13/cobra"
 )
@@ -52,9 +53,9 @@ func runEval(c *cobra.Command) error {
 	}
 
 	card := &eval.Card{
-		DataDir:     filepath.Clean(opts.data),
-		Today:       today.Format("2006-01-02"),
-		Adversarial: opts.adversarial,
+		DataDir:   filepath.Clean(opts.data),
+		Today:     today.Format("2006-01-02"),
+		Negatives: opts.negatives,
 	}
 
 	artifacts, err := eval.LoadArtifacts(opts.out)
@@ -78,6 +79,9 @@ func runEval(c *cobra.Command) error {
 	if opts.capability {
 		card.Capability = runCapabilitySuite(c, opts, traps, corpus, today)
 	}
+	if opts.adversarial {
+		card.Adversarial = runAdversarialSuite(c, opts, traps, corpus, today)
+	}
 	if opts.judge {
 		page, from := judgeTarget(card, artifacts, opts.out)
 		card.Judge = runVoiceJudge(c, corpus, page, from)
@@ -97,6 +101,7 @@ type evalOpts struct {
 	today       string
 	sabotage    string
 	judge       bool
+	negatives   bool
 	adversarial bool
 	capability  bool
 	trials      int
@@ -118,6 +123,7 @@ func evalOptions(c *cobra.Command) (*evalOpts, error) {
 		sabotage:    strings.TrimSpace(r.str("sabotage")),
 		aubadeBin:   r.str("aubade"),
 		judge:       r.boolean("judge"),
+		negatives:   r.boolean("negatives"),
 		adversarial: r.boolean("adversarial"),
 		capability:  r.boolean("capability"),
 		trials:      r.integer("trials"),
@@ -197,6 +203,44 @@ func runCapabilitySuite(c *cobra.Command, o *evalOpts, traps datagen.Traps, corp
 		Loc:    model.Location(),
 		Traps:  traps,
 	})
+}
+
+// runAdversarialSuite has a model write new traps and re-grades a copy of the
+// corpus with them injected.
+//
+// The copy lives under --out rather than beside the corpus, because --data is
+// the exam: everything the harness produces belongs with the run's artifacts,
+// and a directory the harness writes next to a pinned dataset is a dataset
+// somebody will eventually commit by accident.
+func runAdversarialSuite(c *cobra.Command, o *evalOpts, traps datagen.Traps, corpus *model.Corpus, today time.Time) *eval.Adversarial {
+	ctx := c.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return eval.RunAdversarial(ctx, eval.AdversarialInput{
+		Author:  trapAuthor(ctx),
+		DataDir: o.data,
+		WorkDir: filepath.Join(o.out, eval.AdversarialDir),
+		Corpus:  corpus,
+		Traps:   traps,
+		Today:   today,
+		Loc:     model.Location(),
+	})
+}
+
+// trapAuthor picks the runner that writes the new traps: claude by preference,
+// because it is the runner whose structured-output behaviour aubade has
+// actually measured, and any other live runner rather than nothing. Nil when
+// none answered, which the suite reports as a loud skip.
+func trapAuthor(ctx context.Context) runner.Runner {
+	roster := runnerRegistry.Detect(ctx)
+	if claude, ok := roster.Get("claude"); ok {
+		return claude
+	}
+	if live := roster.Live(); len(live) > 0 {
+		return live[0]
+	}
+	return nil
 }
 
 // runVoiceJudge probes the runners and asks them the anchored voice question.
@@ -300,6 +344,24 @@ func reportEval(c *cobra.Command, card *eval.Card, path string) error {
 				"tasks":       tasks,
 			}
 		}
+		if card.Adversarial != nil {
+			caught, total := card.Adversarial.Caught()
+			adv := map[string]any{
+				"skipped":     card.Adversarial.Skipped,
+				"skip_reason": card.Adversarial.SkipReason,
+				"author":      card.Adversarial.Author,
+				"attempts":    card.Adversarial.Attempts,
+				"authored":    len(card.Adversarial.Traps),
+				"rejected":    len(card.Adversarial.Rejections),
+				"caught":      caught,
+				"tasks":       total,
+				"dir":         card.Adversarial.Dir,
+			}
+			if card.Adversarial.Err != nil {
+				adv["error"] = card.Adversarial.Err.Error()
+			}
+			payload["adversarial"] = adv
+		}
 		if card.Sabotage != nil {
 			payload["sabotage"] = map[string]any{
 				"extractor": card.Sabotage.Extractor,
@@ -372,7 +434,8 @@ func evalFlags(c *cobra.Command) {
 	f.String("out", defaultOutDir, "directory holding digest.md and signals.json; scorecard.md is written here")
 	f.String("sabotage", "", "disable one extractor by name and alarm if the score does not drop")
 	f.Bool("judge", false, "run the optional layer-2 model judge for voice and readability")
-	f.Bool("adversarial", false, "report how each negative task stayed out: the rule, the extractor, the evidence")
+	f.Bool("negatives", false, "report how each negative task stayed out: the rule, the extractor, the evidence")
+	f.Bool("adversarial", false, "have a model author new traps, inject them into a copy of the corpus, and re-grade it")
 	f.Bool("capability", false, "run the agentic capability suite (needs the claude CLI; skips loudly without it)")
 	f.Int("trials", eval.DefaultTrials, "trials per task in the capability suite; each one is a paid model run")
 	f.String("aubade", "", "the aubade binary the capability suite drives (default: the one beside this one)")

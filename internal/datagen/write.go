@@ -130,26 +130,35 @@ func renderTasks(tasks []model.Task) []byte {
 	var b strings.Builder
 	b.WriteString("# Tasks\n\nEverything I owe someone, in one place.\n\n")
 	for _, t := range tasks {
-		box := " "
-		if t.Done {
-			box = "x"
-		}
-		fmt.Fprintf(&b, "- [%s] %s", box, t.Title)
-		if t.HasDue() {
-			fmt.Fprintf(&b, " (due: %s)", markdownDate(t.Due))
-		}
-		fmt.Fprintf(&b, " (id: %s)", t.ID)
-		if t.Owner != "" {
-			fmt.Fprintf(&b, " (owner: %s)", t.Owner)
-		}
-		// Map iteration order is not defined, and a corpus that reorders itself
-		// between runs is not byte-identical.
-		for _, k := range slices.Sorted(maps.Keys(t.Meta)) {
-			fmt.Fprintf(&b, " (%s: %s)", k, t.Meta[k])
-		}
-		b.WriteString("\n")
+		b.WriteString(renderTaskLine(t))
 	}
 	return []byte(b.String())
+}
+
+// renderTaskLine is one checklist row, newline included. It is separate from
+// renderTasks because Inject appends rows to a file that already has the
+// heading, and two spellings of this dialect would drift.
+func renderTaskLine(t model.Task) string {
+	var b strings.Builder
+	box := " "
+	if t.Done {
+		box = "x"
+	}
+	fmt.Fprintf(&b, "- [%s] %s", box, t.Title)
+	if t.HasDue() {
+		fmt.Fprintf(&b, " (due: %s)", markdownDate(t.Due))
+	}
+	fmt.Fprintf(&b, " (id: %s)", t.ID)
+	if t.Owner != "" {
+		fmt.Fprintf(&b, " (owner: %s)", t.Owner)
+	}
+	// Map iteration order is not defined, and a corpus that reorders itself
+	// between runs is not byte-identical.
+	for _, k := range slices.Sorted(maps.Keys(t.Meta)) {
+		fmt.Fprintf(&b, " (%s: %s)", k, t.Meta[k])
+	}
+	b.WriteString("\n")
+	return b.String()
 }
 
 // renderNote writes one note with the front matter localfs reads back.
