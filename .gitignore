@@ -3,3 +3,13 @@
 .dolt/
 *.db
 idocs/
+
+# Build output
+bin/
+
+# Run artifacts: digest.md, signals.json, scorecard.md, per-trial dirs
+out/
+
+# Generated synthetic corpus (aubade-lab generate --seed N); reproducible from
+# the seed, so the seed is the artifact worth committing, not the 500 emails.
+data/
