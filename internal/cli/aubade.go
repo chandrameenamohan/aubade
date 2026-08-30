@@ -50,7 +50,7 @@ Examples:
   aubade digest --today 2026-08-30        compose the one-pager
   aubade digest --no-llm                  same facts, zero keys, fixed template
   aubade tool commitments --json          one extractor, cited JSON signals
-  aubade tool thread t-0042 --json        read a thread before ranking it
+  aubade tool thread t-cap-table --json   read a thread before ranking it
   aubade signals --today 2026-08-30       run every extractor, write signals.json
   aubade schedule --design                print the scheduling design`
 
@@ -218,16 +218,21 @@ func newScheduleCmd() *cobra.Command {
 		Short: "Print the scheduling design (design deliverable; no implementation)",
 		Long: strings.TrimSpace(`
 Print the written scheduling design: how a 05:45 PT run gets built, where the
-secrets live, and why a laptop-local cron loses to a hosted schedule.
+secrets live, why a laptop-local cron loses to a hosted schedule and a cloud
+function is over-built at one user, and how a re-run stays idempotent.
 
 Design only, by intent — scheduling implementation is an explicit non-goal for
-week one (SPEC "Non-goals").`),
+week one (SPEC "Non-goals"). The same text is DESIGN.md's scheduling section;
+this command prints it so a shipped binary can answer the question too.
+
+Without --design there is nothing to run, and this says so rather than printing
+a document and exiting 0 as if a job had been scheduled.`),
 		Args: cobra.NoArgs,
-		RunE: stub("E1", "prints the scheduling design shared with DESIGN.md"),
+		RunE: func(c *cobra.Command, _ []string) error { return runSchedule(c) },
 	}
 
 	c.Flags().Bool("design", false, "print the scheduling design document")
+	c.Flags().Bool("json", false, "wrap the design in a JSON envelope (default when an AI agent caller is detected)")
 
-	annotate(c, "E1")
 	return c
 }

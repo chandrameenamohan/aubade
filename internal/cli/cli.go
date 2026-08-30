@@ -1,6 +1,12 @@
 // Package cli builds aubade's two command trees — the product (`aubade`) and
-// the internal harness (`aubade-lab`) — and the shared plumbing they need:
-// the not-implemented-yet stub error, and AX-aware error rendering.
+// the internal harness (`aubade-lab`) — and the shared plumbing they need,
+// which is now just AX-aware error rendering.
+//
+// Every command in both trees is implemented. The scaffolding that used to
+// announce the unbuilt ones — a StubError naming the bead that would land it,
+// rendered as a `not_implemented` envelope for agent callers — went out with
+// the last stub in bead D3, because machinery with nothing left to announce is
+// machinery a reader has to rule out.
 //
 // The trees live here rather than in cmd/*/main.go so they are unit-testable:
 // help text and flag contracts are graded UX, so they get tests like anything
@@ -22,40 +28,6 @@ import (
 //	go build -ldflags "-X github.com/chandrameenamohan/aubade/internal/cli.Version=1.2.3"
 var Version = "0.1.0-dev"
 
-// StubError is returned by a command whose behaviour is not built yet. It names
-// the bead that will implement it, so a `not implemented` message is a pointer
-// into the plan rather than a dead end. Bead ids track the orchestrator's plan:
-// B1 dataset generator, C1 deterministic toolbox, C2 digest scoring, sectioning
-// and rendering (`--no-llm`), C3 the agentic orchestrator over that toolbox,
-// D1 eval harness, E1 scheduling design — of which only E1 is still a stub.
-type StubError struct {
-	Command string // e.g. "aubade digest"
-	Bead    string // e.g. "C2"
-	What    string // one line on what will land there
-}
-
-func (e *StubError) Error() string {
-	return fmt.Sprintf("%s: not implemented yet (bead %s) — %s", e.Command, e.Bead, e.What)
-}
-
-// stub returns a RunE that fails with a StubError, and records the bead on the
-// command so `--help` can advertise its status honestly.
-func stub(bead, what string) func(*cobra.Command, []string) error {
-	return func(c *cobra.Command, _ []string) error {
-		return &StubError{Command: c.CommandPath(), Bead: bead, What: what}
-	}
-}
-
-// annotate marks a command as an unimplemented stub for help rendering.
-func annotate(c *cobra.Command, bead string) *cobra.Command {
-	if c.Annotations == nil {
-		c.Annotations = map[string]string{}
-	}
-	c.Annotations["aubade.bead"] = bead
-	c.Annotations["aubade.status"] = "stub"
-	return c
-}
-
 // RenderError writes err in the shape the current caller expects: a JSON
 // envelope for a detected AI agent (machine-parseable errors are the whole
 // point of the AX layer, SPEC §9), plain prose for a human.
@@ -71,15 +43,6 @@ func RenderError(w io.Writer, err error) {
 	payload := map[string]any{
 		"ok":    false,
 		"error": map[string]any{"message": err.Error(), "kind": "error"},
-	}
-	if se, isStub := err.(*StubError); isStub {
-		payload["error"] = map[string]any{
-			"kind":    "not_implemented",
-			"message": se.Error(),
-			"command": se.Command,
-			"bead":    se.Bead,
-			"hint":    "this subcommand is scaffolded but not built yet; do not retry",
-		}
 	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")

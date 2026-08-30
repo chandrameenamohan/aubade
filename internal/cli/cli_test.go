@@ -27,7 +27,7 @@ func TestAubadeSurface(t *testing.T) {
 		"digest":   {"data", "today", "customize", "no-llm", "runner", "consensus", "out", "json"},
 		"tool":     {"json"},
 		"signals":  {"today"},
-		"schedule": {"design"},
+		"schedule": {"design", "json"},
 	}
 
 	root := NewAubadeCmd()
@@ -77,36 +77,23 @@ func TestProductCarriesNoHarnessCommands(t *testing.T) {
 	}
 }
 
-// Every stub must fail loudly and name its bead. A stub that exits 0 would let
-// the gate go green over an empty binary.
-//
-// Both `digest` modes came off this list when they were built, and the eval
-// harness came off it in bead D1: it now loads the answer key, grades the page
-// on disk and writes the scorecard (lab_eval_test.go). The scheduling design is
-// the last stub standing.
-func TestStubsFailAndNameTheirBead(t *testing.T) {
-	cases := []struct {
-		root *cobra.Command
-		args []string
-	}{
-		{NewAubadeCmd(), []string{"schedule", "--design"}},
-	}
-
-	for _, tc := range cases {
-		name := strings.Join(tc.args, " ")
-		_, err := run(tc.root, tc.args...)
-		if err == nil {
-			t.Fatalf("%s: expected a not-implemented error, got nil", name)
-		}
-		var se *StubError
-		if !errors.As(err, &se) {
-			t.Fatalf("%s: expected *StubError, got %T (%v)", name, err, err)
-		}
-		if se.Bead == "" {
-			t.Errorf("%s: stub does not name a bead", name)
-		}
-		if !strings.Contains(se.Error(), "not implemented yet") {
-			t.Errorf("%s: unclear stub message %q", name, se.Error())
+// No command in either tree may still be a stub. Stubs exited non-zero naming
+// the bead that would build them; the last one (`schedule`) was built in bead
+// D3, so what is left to guard is that none came back — a command that answers
+// "not implemented yet" is one the eval harness and every agent caller cannot
+// use, and it should be impossible to add one back without this failing.
+func TestNoCommandIsAStub(t *testing.T) {
+	for _, root := range []*cobra.Command{NewAubadeCmd(), NewLabCmd()} {
+		for _, c := range root.Commands() {
+			if c.RunE == nil && c.Run == nil && !c.HasSubCommands() {
+				t.Errorf("%s does nothing when run", c.CommandPath())
+			}
+			help := strings.ToLower(c.Long)
+			for _, marker := range []string{"not implemented", "not built yet", "stub"} {
+				if strings.Contains(help, marker) {
+					t.Errorf("%s: help text still advertises %q", c.CommandPath(), marker)
+				}
+			}
 		}
 	}
 }
@@ -197,14 +184,13 @@ func TestRenderErrorJSONForAgents(t *testing.T) {
 	t.Setenv("AUBADE_OUTPUT", "json")
 
 	var buf bytes.Buffer
-	RenderError(&buf, &StubError{Command: "aubade digest", Bead: "C2", What: "the renderer"})
+	RenderError(&buf, errors.New("no corpus at data"))
 
 	var payload struct {
 		OK    bool `json:"ok"`
 		Error struct {
 			Kind    string `json:"kind"`
 			Message string `json:"message"`
-			Bead    string `json:"bead"`
 		} `json:"error"`
 	}
 	if err := json.Unmarshal(buf.Bytes(), &payload); err != nil {
@@ -213,7 +199,7 @@ func TestRenderErrorJSONForAgents(t *testing.T) {
 	if payload.OK {
 		t.Error("error envelope reports ok=true")
 	}
-	if payload.Error.Kind != "not_implemented" || payload.Error.Bead != "C2" {
+	if payload.Error.Kind != "error" || payload.Error.Message != "no corpus at data" {
 		t.Errorf("unexpected error envelope: %+v", payload.Error)
 	}
 }
