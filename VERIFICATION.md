@@ -54,6 +54,16 @@ API keys and no network beyond the Go module cache:
   menu, argument validation, and the JSON-vs-prose error envelope. These are
   asserted because the eval harness and every agent caller bind to them; a
   silently renamed flag is a silently broken integration.
+- **The trap catalog** (`internal/datagen`) — because each trap emits both its
+  artifacts and its own answer-key entry, the tests assert things a hand-written
+  `traps.json` could only promise: every extractor in `model.KnownKinds` has at
+  least one task behind it, every `planted_ref` resolves to an artifact some
+  scenario actually wrote, every keyword a trap will be graded on is quotable
+  from that trap's own cited evidence, no reply predates the message it answers,
+  and the same `(seed, --today)` produces a byte-identical plan. What it does
+  *not* assert is that anything finds those traps: the extractors are graded
+  against their own fixtures (below), and the exam and the student are only
+  joined by the eval harness in bead D1.
 - **The deterministic toolbox** (`internal/extract`) — the seven extractors, `thread`
   and `search`, run against hand-written fixture corpora under
   `internal/extract/testdata/` with a fixed `--today`. Both directions are asserted:
@@ -63,7 +73,9 @@ API keys and no network beyond the Go module cache:
   its own — the same corpus is loaded and extracted six times and the serialized
   bytes are compared, which is the only reliable way to catch map iteration order.
   A separate test walks every citation on every signal and fails if any ref does not
-  resolve to a record in the corpus.
+  resolve to a record in the corpus. These fixtures are deliberately *not* the
+  generated corpus: an extractor graded only against the data its own teammate
+  planted proves less than one graded against a corpus written to trip it.
 - **The end-to-end regression scenario** (once bead D1 lands) — `aubade-lab generate`
   is seeded, `aubade digest --no-llm` runs a fixed extractor order over that fixed
   corpus, and `aubade-lab eval` asserts each planted trap present and each negative
