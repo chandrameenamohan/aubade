@@ -80,17 +80,15 @@ func TestProductCarriesNoHarnessCommands(t *testing.T) {
 // Every stub must fail loudly and name its bead. A stub that exits 0 would let
 // the gate go green over an empty binary.
 //
-// `digest --no-llm` used to be on this list and is not any more: it is built,
-// and its own tests live in digest_test.go. Agentic mode is what remains
-// stubbed, and it fails rather than silently falling back to the template —
-// composing the page a different way than the user asked for is exactly the
-// kind of quiet substitution this product exists not to make.
+// Both `digest` modes used to be on this list and neither is any more: `--no-llm`
+// composes the page from templates (digest_test.go) and the default mode drives
+// a runner over the toolbox (agentic_test.go). What remains stubbed is the
+// scheduling design and the eval harness.
 func TestStubsFailAndNameTheirBead(t *testing.T) {
 	cases := []struct {
 		root *cobra.Command
 		args []string
 	}{
-		{NewAubadeCmd(), []string{"digest"}},
 		{NewAubadeCmd(), []string{"schedule", "--design"}},
 		{NewLabCmd(), []string{"eval", "--judge"}},
 	}

@@ -13,16 +13,20 @@ import (
 
 // `aubade digest` wiring.
 //
-// Two modes share this file's front half. `--no-llm` is built: load the corpus,
-// run every extractor in the fixed order, compose the page from the signals,
-// write it. Agentic mode is not, and its stub says so rather than silently
-// falling back — a digest that quietly composed itself a different way than the
-// user asked for is exactly the kind of thing this product exists not to do.
+// Two modes share this file's front half, and the flag check between them is
+// the only decision made here. `--no-llm` loads the corpus, runs every extractor
+// in the fixed order, composes the page from the signals and writes it. Agentic
+// mode does the same first half and then hands the toolbox to a runner
+// (agentic.go). Neither ever silently becomes the other: a digest that quietly
+// composed itself a different way than the user asked for is exactly the kind of
+// thing this product exists not to do.
 //
-// The run writes two files, not one. `digest.md` is the product; `signals.json`
-// beside it is the fact base that page was composed from, so a wrong line can
-// be diagnosed as mis-ranked (it is in signals.json) or as missed (it is not) —
-// two different bugs — and so the eval harness can grade both from one run.
+// A run writes more than one file, and that is the point. `digest.md` is the
+// product; `signals.json` beside it is the fact base that page was composed
+// from, so a wrong line can be diagnosed as mis-ranked (it is in signals.json)
+// or as missed (it is not) — two different bugs — and so the eval harness can
+// grade both from one run. Agentic mode adds `transcript.jsonl`, which is the
+// third question: did the loop actually call the toolbox for what it said.
 
 // runDigest executes `aubade digest`.
 func runDigest(c *cobra.Command) error {
@@ -41,11 +45,7 @@ func runDigest(c *cobra.Command) error {
 		return fmt.Errorf("--customize needs the agentic composer and --no-llm does not run it; drop one of the two flags")
 	}
 	if !noLLM {
-		return &StubError{
-			Command: c.CommandPath(),
-			Bead:    "C3",
-			What:    "agentic orchestration over the toolbox (runners, consensus, --customize); run with --no-llm for the deterministic digest today",
-		}
+		return runAgenticDigest(c)
 	}
 	return runNoLLMDigest(c)
 }

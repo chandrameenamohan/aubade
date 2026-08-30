@@ -87,17 +87,24 @@ same extractors in a fixed order through the default template instead: identical
 facts, no network, no keys.
 
 Consensus is on by default. At bounded one-shot decision points (ambiguous
-urgency, the "one thing right now" pick) aubade asks every runner it finds and
-majority-votes; disagreement routes the item to "I'm not sure" with the thread
-shown, rather than a coin flip. One runner installed means single-runner,
-silently. --consensus=off is the frugal flag.
+urgency, the "one thing right now" pick) aubade asks every runner that answers a
+liveness probe and majority-votes; disagreement routes the item to "I'm not sure"
+with the thread shown, rather than a coin flip. A runner that is installed but
+cannot answer is dropped rather than counted as a dissent, and the footer names
+it. One runner answering means single-runner, silently. --consensus=off is the
+frugal flag.
 
 The honesty layer is not customizable: --customize reshapes format, never
-truthfulness.
+truthfulness. The staleness banner, contradictions and "I'm not sure" are
+appended by aubade from the signals whatever the composer wrote.
 
---no-llm writes out/digest.md and, beside it, the out/signals.json it was
+Either mode writes out/digest.md and, beside it, the out/signals.json it was
 composed from — so a wrong line can be diagnosed as mis-ranked or as missed,
-which are two different bugs.`),
+which are two different bugs. Agentic mode also writes out/transcript.jsonl, the
+loop's own record of which tools it called. Every citation on a composed page is
+checked against signals.json before it is written; a page that cites anything
+else is rejected whole and the deterministic composer writes the digest instead,
+loudly.`),
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error { return runDigest(c) },
 	}
@@ -107,7 +114,7 @@ which are two different bugs.`),
 	f.String("today", "", "anchor date, YYYY-MM-DD (default: system date, America/Los_Angeles)")
 	f.String("customize", "", "path to a prompt.md that reshapes the digest format (agentic mode only)")
 	f.Bool("no-llm", false, "fixed-order extractors + default template: no network, no API keys")
-	f.String("runner", "claude", "orchestration runner: claude|codex|gemini")
+	f.String("runner", "claude", "orchestration runner: claude (codex votes in consensus but cannot drive the toolbox)")
 	f.String("consensus", "on", "fan one-shot decisions to every installed runner and majority-vote: on|off")
 	f.String("out", defaultOutDir, "directory for digest.md and the run's artifacts")
 	f.Bool("json", false, "emit the run as JSON (default when an AI agent caller is detected)")

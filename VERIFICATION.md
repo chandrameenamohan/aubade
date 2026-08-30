@@ -32,6 +32,7 @@ Other targets:
 | `make build` | both binaries into `./bin/` |
 | `make test` | unit tests only |
 | `make e2e` | the end-to-end scenario only |
+| `make check-agentic` | the live agentic digest against the real claude CLI — **not** in `make check` (see §3.2) |
 | `make golden` | rewrite the committed golden digests (see §2) |
 | `make hooks` | install the local git hooks (see §4) |
 | `make fmt` / `make fmt-check` | gofmt; `fmt-check` is advisory, not in the gate |
@@ -95,6 +96,29 @@ API keys and no network beyond the Go module cache:
   sure" whatever the extractor hinted, contradictions render both sides with a
   citation each, and no draft is written for the person the profile protects or
   contains an answer the corpus does not.
+- **The agentic layer** (`internal/runner`, `internal/agentic`) — everything
+  about the orchestrated digest *except* the model call itself, which is
+  §3.2's. The runners are exercised through `internal/runner/runnertest`, a
+  scripted `Runner`, so `go test ./...` never shells out to claude: a unit test
+  that calls a model costs money, needs auth, and is non-deterministic — three
+  separate disqualifications from a gate. What that leaves gradeable is most of
+  the interesting surface: the consensus vote math at every roster size (one
+  runner decides alone; a 1–1 split has no majority and routes to "I'm not
+  sure"; a runner that errors or answers off-schema is *dropped* rather than
+  counted as a dissent), detection separating live from dead from absent, the
+  registry and its `--runner` menu, the transport contracts the learning tests
+  pinned (the double decode of claude's `.result`, tool-call counting and the
+  turn cap read off the streamed transcript, the exact allowlist string), and
+  every degradation path the CLI can end in — each with a message that names
+  `--no-llm`.
+  The load-bearing one is the citation validator: a composed page carrying a
+  single ref that is not in `signals.json` is rejected whole, and both
+  directions are asserted — an injected fake ref is caught by ref, and ordinary
+  markdown links are not mistaken for citations. Around it, the invariants that
+  make "format is the user's, truthfulness is the product's" true rather than
+  merely requested: the honesty floor is appended from the fact base whatever
+  the composer wrote, it survives a `--customize` prompt that asks for it to go
+  away, and the footer names who orchestrated, who voted, and who could not.
 - **The end-to-end regression scenario** (once bead D1 lands) — `aubade-lab generate`
   is seeded, `aubade digest --no-llm` runs a fixed extractor order over that fixed
   corpus, and `aubade-lab eval` asserts each planted trap present and each negative
@@ -155,6 +179,7 @@ bin/aubade-lab eval --out out/          # non-zero exit on any regression miss
 | Not gated | Why |
 |---|---|
 | **Capability suite** (agentic digest, N=3 trials, `pass^3` / `pass@3`) | Non-deterministic and needs a model runner. Runs locally when the claude CLI is present, with a loud SKIP otherwise — never a silent one. |
+| **`make check-agentic`** (`scripts/agentic-e2e.sh`) | The live agentic digest against the real claude CLI: two model-driven runs over the seeded corpus. It proves what no unit test can — that claude accepts the flags aubade hands it on the version installed here, that the allowlisted loop really calls `aubade tool`, that the composed page survived aubade's own citation check, and that `--customize` reshaped the page while the honesty floor stayed on it. Skips **loudly** when claude is absent, with a banner saying the agentic digest is unverified on this machine. |
 | **Sabotage runs** (`aubade-lab eval --sabotage=<extractor>`) | On-demand and periodic. It proves the *graders* can see (score must drop when an extractor is disabled); it is a check on the exam, not on the commit. |
 | **Judge grader** (`aubade-lab eval --judge`) | Model-scored voice/readability. Layer 2, by definition not binary, so it informs but never blocks. |
 | **`make fmt-check`** | Advisory. Formatting noise should not be able to block a correctness fix. |
@@ -171,12 +196,31 @@ and `traps.json` — and the same `(seed, --today)` produces byte-identical file
 from those signals and writes `out/digest.md` with `out/signals.json` beside it,
 with no network and no keys.
 
-`aubade digest` **without** `--no-llm` — agentic mode — still exits 1 and names
-its bead (C3), and it does not fall back to the template. Composing the page a
-different way than the user asked for would be exactly the quiet substitution
-this product exists not to make. `--customize` with `--no-llm` is refused for
-the same reason: customization reshapes the compose stage, and `--no-llm` has no
-compose stage to reshape.
+`aubade digest` **without** `--no-llm` — agentic mode — is real as of bead C3:
+it runs the toolbox, majority-votes the two bounded decisions across every
+runner that answers a probe, hands the toolbox to the chosen runner behind an
+allowlist, checks every citation on what comes back, and writes
+`out/digest.md`, `out/signals.json` and `out/transcript.jsonl`.
+
+Two substitutions it will **not** make quietly, and they are different on
+purpose:
+
+- A runner that cannot be driven at all — absent, unauthenticated, or a loop
+  that blew its budget — is an **error** naming `--no-llm`. There is no page,
+  and composing one a different way than the user asked for is the quiet
+  substitution this product exists not to make.
+- A page the runner *did* compose and aubade then **rejected** — because a
+  citation on it is not in `signals.json` — falls back to the deterministic
+  composer, and says so in three places: a blockquote at the top of the page,
+  the footer, and stderr. There the facts exist and only the page is untrusted,
+  so refusing to print anything would serve nobody; what matters is that nobody
+  can mistake which composer wrote it.
+
+`--customize` with `--no-llm` is still refused: customization reshapes the
+compose stage, and `--no-llm` has no compose stage to reshape. `--customize`
+cannot reach the honesty layer either — the banner, contradictions and "I'm not
+sure" are appended by aubade from the signals after the composer is done, so a
+prompt that asks for them to go away simply does not get them removed.
 
 The remaining stubs still exit 1 with `not implemented yet (bead X)` and name
 the bead that will build them: `aubade schedule` (E1) and `aubade-lab eval`
