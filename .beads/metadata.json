@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "idailydigest",
+  "project_id": "ce4fbc71-b801-4cbf-ab9f-789944f89abe"
+}

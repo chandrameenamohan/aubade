@@ -1,0 +1,11 @@
+{
+  "config_version": "2",
+  "repo_id": "repo_01a0528b-bfab-73d8-b33f-390daaec7c8f",
+  "repo_remote_hashes": [
+    "sha256:93cbc3ea29ec03cbba4fddea7d29dfa061b15f25feba5b9ce1299e81135d4aac"
+  ],
+  "team_id": "team_icxdwi8r5b",
+  "team_name": "aubade",
+  "endpoint": "https://sageox.ai",
+  "update_frequency_hours": 24
+}
