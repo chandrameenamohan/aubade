@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -114,7 +115,7 @@ func TestCapabilityReportsBothRates(t *testing.T) {
 	} {
 		res := &Result{}
 		for _, trap := range traps {
-			res.Traps = append(res.Traps, TrapResult{ID: trap.ID, Passed: contains(passes, trap.ID)})
+			res.Traps = append(res.Traps, TrapResult{ID: trap.ID, Passed: slices.Contains(passes, trap.ID)})
 		}
 		suite.Trials = append(suite.Trials, &Trial{N: i + 1, Result: res})
 	}

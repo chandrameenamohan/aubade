@@ -85,6 +85,7 @@ package eval
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/chandrameenamohan/aubade/internal/datagen"
@@ -253,7 +254,7 @@ func positiveReason(r TrapResult, trap datagen.Trap) string {
 	case r.Keyword == "":
 		return fmt.Sprintf("%s produced the signal but the page never says any of %s — surfaced in signals.json and lost in the render",
 			strings.Join(r.By, ", "), quoteList(trap.Expect.Keywords))
-	case !contains(r.By, r.Expected):
+	case !slices.Contains(r.By, r.Expected):
 		return fmt.Sprintf("surfaced by %s and found in the page as %q — the answer key expected %s",
 			strings.Join(r.By, ", "), r.Keyword, r.Expected)
 	default:
@@ -289,15 +290,6 @@ func findKeyword(lowerPage string, keywords []string) string {
 		}
 	}
 	return ""
-}
-
-func contains(list []string, want string) bool {
-	for _, s := range list {
-		if s == want {
-			return true
-		}
-	}
-	return false
 }
 
 func quoteList(ss []string) string {

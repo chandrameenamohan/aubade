@@ -4,6 +4,14 @@
 agentic orchestration, agentx-style agent awareness, connector interface (Composio as the
 production provider, week two).*
 
+> **Status: built, and this document is the design as it was written, not a
+> changelog.** Every keystone decision below shipped. Five places where the code
+> now says something narrower or wider than the map are listed in **§12**, which
+> is the only section written after the build. Read §12 before trusting a detail
+> here; the rest of this document is deliberately left as the record of what was
+> decided up front, because a design doc quietly rewritten to match its own
+> implementation stops being evidence of anything.
+
 ## 1 · Problem framing
 
 Avery Chen (fictional founder, mid-Series-A) needs 90-second morning triage over four
@@ -186,3 +194,55 @@ trap asserted present, every suppression asserted absent, non-zero exit on a mis
 gate wraps build + unit tests + that end-to-end eval, proven to block before any builder
 runs. Data access hides behind a DataSource interface — LocalFS now, Composio is week
 two's real-Gmail provider.
+
+## 12 · Status — where the built thing differs from this map
+
+Written after the build, from the shipped binaries. Nothing here reverses a decision
+above; each item is the map being redrawn where the territory turned out narrower or
+wider. Everything not listed shipped as designed.
+
+**1. gemini is not a runner. Codex votes but cannot drive the toolbox.**
+§2 and §3 say "claude CLI default; codex/gemini pluggable". The shipped registry
+holds claude and codex only, and codex is `Ask`-only. gemini was never found on the
+development machine under any name, so its headless syntax has never been verified
+against the real binary (`learning-tests/05`); registering it would have put a guess
+into a majority vote, which is worse than having one fewer voter. Codex's `exec`
+one-shot was verified; a codex tool-calling loop was not, so it answers consensus
+questions and refuses to orchestrate rather than pretending. The interface is
+unchanged and still vendor-neutral — this is a roster fact, not an architecture one.
+
+**2. The eval harness grew three flags this document never named.**
+§3 shows `aubade-lab eval [--sabotage=X --judge]`. It ships with `--capability`
+(the agentic suite, N trials, pass^N/pass@N), `--negatives` (how each negative task
+stayed out — the rule that held it, or the fact that nothing looked at it), and
+`--adversarial`: a model authors traps this repository did not write, they are
+injected into a *copy* of the corpus, and the harness re-grades the copy. The
+adversarial pass is absent from §4's sketch entirely. It never gates and never
+touches the exit code — those tasks did not exist before the run, so a miss is
+coverage news, not a regression — which is why it could be added without
+disturbing the keystone claim that the gate is deterministic.
+
+**3. Six negative traps, not "4–5".** §6 estimates ~12–15 positive and 4–5
+negative. `--seed 42` writes 14 positive and 6 negative. The sixth negative exists
+because suppression turned out to have two distinguishable passes — held back by a
+profile rule, and never claimed by any extractor — and grading only the first would
+have let the second look like success.
+
+**4. The command surface carries more flags than §3's sketch.**
+`digest` also takes `--data`, `--runner`, `--consensus`, `--json`; `tool` and
+`signals` take `--data`/`--today`/`--out`/`--json`; `eval` takes `--data`,
+`--today`, `--out`, `--trials`, `--aubade`, `--json`. §3 was a shape sketch and is
+still the right shape; `--help` is the contract, and `TestAubadeSurface` /
+`TestLabSurface` hold it.
+
+**5. The scheduling design is embedded in the binary.** §10 and §3 describe
+`aubade schedule --design` printing the design. It prints
+`internal/cli/schedule_design.md`, compiled in, so a shipped `aubade` answers with no
+repo checked out — and a test fails the moment that text and DESIGN.md's scheduling
+section disagree. `aubade schedule` without `--design` exits non-zero: it scheduled
+nothing, and to an agent caller a zero exit reads as "the job is scheduled".
+
+Two things §2 asserted that are worth recording as *held*, since they were the
+risky ones: the consensus layer came in at ~200 lines over our own `Runner`
+interface (§5's estimate, unrevised), and both orchestration modes pass the same
+trap harness — the dual-mode bar §8 called the defense of the whole split.

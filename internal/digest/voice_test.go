@@ -1,6 +1,7 @@
 package digest
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestProfileTonRulesOverrideTheBase(t *testing.T) {
 	if v.Signoff != "Avery" {
 		t.Errorf("signoff = %q, want Avery (profile.md:46)", v.Signoff)
 	}
-	if !contains(v.Banned, "I hope this email finds you well") || !contains(v.Banned, "circling back") {
+	if !slices.Contains(v.Banned, "I hope this email finds you well") || !slices.Contains(v.Banned, "circling back") {
 		t.Errorf("banned phrases = %v, want both quoted phrases from profile.md:47", v.Banned)
 	}
 	if len(v.NoDraft) != 1 || v.NoDraft[0] != "Sam" {

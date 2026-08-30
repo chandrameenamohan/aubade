@@ -217,9 +217,6 @@ func (t *Toolbox) indexEmails() {
 	}
 }
 
-// Threads returns every thread, ordered by thread id.
-func (t *Toolbox) Threads() []*Thread { return t.threads }
-
 // Extractor is one signal-producing tool.
 type Extractor func() (model.Signals, error)
 

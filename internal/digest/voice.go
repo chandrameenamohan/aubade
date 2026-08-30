@@ -2,6 +2,7 @@ package digest
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/chandrameenamohan/aubade/internal/model"
@@ -342,7 +343,7 @@ func (v *Voice) Overrides() []VoiceRule {
 		seen []string
 	)
 	for _, r := range v.Applied {
-		if r.Path != v.ProfilePath || contains(seen, r.Ref()) {
+		if r.Path != v.ProfilePath || slices.Contains(seen, r.Ref()) {
 			continue
 		}
 		seen = append(seen, r.Ref())
