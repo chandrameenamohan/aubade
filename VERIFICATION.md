@@ -54,6 +54,16 @@ API keys and no network beyond the Go module cache:
   menu, argument validation, and the JSON-vs-prose error envelope. These are
   asserted because the eval harness and every agent caller bind to them; a
   silently renamed flag is a silently broken integration.
+- **The deterministic toolbox** (`internal/extract`) — the seven extractors, `thread`
+  and `search`, run against hand-written fixture corpora under
+  `internal/extract/testdata/` with a fixed `--today`. Both directions are asserted:
+  every planted positive is found, and every hard negative stays silent (a kept
+  promise, an answered thread, a suppressed newsletter that ends in a question, an
+  FYI, a cancelled meeting, a long thread the owner closed). Determinism is a test of
+  its own — the same corpus is loaded and extracted six times and the serialized
+  bytes are compared, which is the only reliable way to catch map iteration order.
+  A separate test walks every citation on every signal and fails if any ref does not
+  resolve to a record in the corpus.
 - **The end-to-end regression scenario** (once bead D1 lands) — `aubade-lab generate`
   is seeded, `aubade digest --no-llm` runs a fixed extractor order over that fixed
   corpus, and `aubade-lab eval` asserts each planted trap present and each negative
@@ -85,7 +95,10 @@ yet running has to say so on every run, or the gate quietly becomes theatre and
 someone eventually cites it as proof of something it never checked.
 
 So today, a green `make check` proves: **it compiles, it vets, and the unit tests
-pass.** It does not prove any digest is correct, because no digest exists yet.
+pass** — including the toolbox's own trap-shaped tests over its hand-written
+fixtures. It does not yet prove any *digest* is correct, because no digest exists,
+and it does not prove the extractors behave on the generated 500-email corpus,
+because that corpus is bead B1's and the eval that grades it is bead D1's.
 
 Bead D1 replaces the stub body with the real scenario (SPEC "End-to-end
 verification scenario") and the script starts failing the gate on any regression
@@ -109,10 +122,12 @@ bin/aubade-lab eval --out out/          # non-zero exit on any regression miss
 
 ### 3.3 Currently stubbed commands
 
-Every subcommand of both binaries exits 1 with `not implemented yet (bead X)` and
-names the bead that will build it: B1 generator, C1 toolbox, C2 digest, D1 eval,
-E1 scheduling design. Stubs exit **non-zero** on purpose — a stub that exits 0
-lets a gate go green over an empty binary.
+`aubade tool` and `aubade signals` are real as of bead C1: they load a corpus,
+run the extractors, and emit cited signals (`aubade signals` writes
+`out/signals.json`). The rest still exit 1 with `not implemented yet (bead X)`
+and name the bead that will build them: `aubade digest` (C2), `aubade schedule`
+(E1), `aubade-lab generate` (B1), `aubade-lab eval` (D1). Stubs exit **non-zero**
+on purpose — a stub that exits 0 lets a gate go green over an empty binary.
 
 ### 3.4 Learning tests — the dependencies the gate cannot touch
 

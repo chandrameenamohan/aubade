@@ -86,9 +86,6 @@ func TestStubsFailAndNameTheirBead(t *testing.T) {
 	}{
 		{NewAubadeCmd(), []string{"digest"}},
 		{NewAubadeCmd(), []string{"digest", "--no-llm"}},
-		{NewAubadeCmd(), []string{"tool", "commitments", "--json"}},
-		{NewAubadeCmd(), []string{"tool", "thread", "t-1"}},
-		{NewAubadeCmd(), []string{"signals"}},
 		{NewAubadeCmd(), []string{"schedule", "--design"}},
 		{NewLabCmd(), []string{"generate", "--seed", "42"}},
 		{NewLabCmd(), []string{"eval", "--judge"}},
@@ -138,16 +135,22 @@ func TestToolArgValidation(t *testing.T) {
 		}
 	}
 
-	// Every advertised tool name must be accepted by the validator.
+	// Every advertised tool name must be accepted by the validator and reach
+	// the engine. `thread x` and `search x` find nothing in this corpus, which
+	// is a lookup error, not a validation one — the distinction is the point.
 	for _, name := range toolNames {
-		args := []string{"tool", name}
+		args := []string{"tool", name, "--data", corpusDir, "--today", corpusDay}
 		if _, needsArg := toolsTakingArg[name]; needsArg {
-			args = append(args, "x")
+			args = append([]string{"tool", name, "nope"}, args[2:]...)
 		}
 		_, err := run(NewAubadeCmd(), args...)
-		var se *StubError
-		if !errors.As(err, &se) {
-			t.Errorf("tool %s rejected by validation: %v", name, err)
+		if err == nil {
+			continue
+		}
+		for _, validation := range []string{"unknown tool", "requires an extractor", "takes no arguments"} {
+			if strings.Contains(err.Error(), validation) {
+				t.Errorf("tool %s rejected by argument validation: %v", name, err)
+			}
 		}
 	}
 }

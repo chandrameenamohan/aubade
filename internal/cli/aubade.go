@@ -136,12 +136,12 @@ Extractors:
   search <query>   search the corpus`),
 		Args:      toolArgs,
 		ValidArgs: toolNames,
-		RunE:      stub("C1", "the pure, cited extractors and their JSON signal contract"),
+		RunE:      runTool,
 	}
 
 	c.Flags().Bool("json", false, "emit JSON signals (default when an AI agent caller is detected)")
+	corpusFlags(c)
 
-	annotate(c, "C1")
 	return c
 }
 
@@ -190,12 +190,13 @@ cited fact base the digest is composed from.
 This is the audit surface. If a line in the digest is wrong, it is either here
 and mis-ranked, or it is not here at all — and those are two different bugs.`),
 		Args: cobra.NoArgs,
-		RunE: stub("C1", "runs the full extractor set and writes out/signals.json"),
+		RunE: func(c *cobra.Command, _ []string) error { return runSignals(c) },
 	}
 
-	c.Flags().String("today", "", "anchor date, YYYY-MM-DD (default: system date, America/Los_Angeles)")
+	corpusFlags(c)
+	c.Flags().String("out", defaultOutDir, "directory for signals.json")
+	c.Flags().Bool("json", false, "emit the signal set on stdout too (default when an AI agent caller is detected)")
 
-	annotate(c, "C1")
 	return c
 }
 
