@@ -2,6 +2,7 @@ package digest
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -84,7 +85,7 @@ func distinctiveWords(s string) []string {
 		if len(w) < 3 || stopwords[w] {
 			continue
 		}
-		if !contains(out, w) {
+		if !slices.Contains(out, w) {
 			out = append(out, w)
 		}
 	}
@@ -95,20 +96,11 @@ func distinctiveWords(s string) []string {
 func appendUnique(dst []string, values ...string) []string {
 	for _, v := range values {
 		v = strings.TrimSpace(v)
-		if v != "" && !contains(dst, v) {
+		if v != "" && !slices.Contains(dst, v) {
 			dst = append(dst, v)
 		}
 	}
 	return dst
-}
-
-func contains(list []string, want string) bool {
-	for _, v := range list {
-		if v == want {
-			return true
-		}
-	}
-	return false
 }
 
 // quoted wraps a fragment of somebody else's words.

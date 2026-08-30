@@ -3,6 +3,7 @@ package agentic
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -229,10 +230,7 @@ func TestEveryVoterIsAskedTheIdenticalGroundedQuestion(t *testing.T) {
 // ones worth paying for.
 func TestUrgencyVotingIsCapped(t *testing.T) {
 	in := testInput(nil, voterFor("claude", `{"urgent":false,"why":"no"}`))
-	var many model.Signals
-	for _, s := range testSignals() {
-		many = append(many, s)
-	}
+	many := slices.Clone(testSignals())
 	for i := 0; i < 10; i++ {
 		s := many[2]
 		s.ID = s.ID + "#" + string(rune('a'+i))

@@ -105,7 +105,9 @@ type Roster struct {
 // Live returns the runners that answered a probe, in registration order.
 func (r *Roster) Live() []Runner { return append([]Runner(nil), r.live...) }
 
-// LiveNames is the footer's list of voters.
+// LiveNames is the bare list of runners that answered. The digest footer wants
+// Describe() instead — it owes the reader the dead and absent ones too — so this
+// is the short form, for a caller that only needs who voted.
 func (r *Roster) LiveNames() []string {
 	out := make([]string, 0, len(r.live))
 	for _, x := range r.live {
