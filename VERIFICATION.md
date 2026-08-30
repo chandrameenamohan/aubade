@@ -142,6 +142,19 @@ API keys and no network beyond the Go module cache:
   driven by scripted runners — one runner decides alone, a split falls to
   `uncertain`, a runner that errors is dropped, and a grade with no reasoning
   behind it is refused because reason-before-score is the contract.
+- **The adversarial suite's machinery** (`internal/eval/adversarial_test.go`,
+  `internal/datagen/inject_test.go`) — the suite itself needs a model and so
+  lives outside the gate (§3.2), but everything it does to a corpus is asserted
+  inside it against scripted runners. Three claims carry the weight: the
+  original data directory is byte-identical after a run (every file hashed
+  before and after, with the copy asserted to have actually changed, so the test
+  cannot be satisfied by a suite that did nothing); an invalid scenario is
+  rejected with every rule it broke and re-asked exactly once, no more, while
+  the valid half of the same answer survives; and nothing unvalidated reaches
+  the corpus — a colliding id, a date outside the window, a reply that predates
+  its parent, a keyword the scenario never planted are each their own named
+  refusal. `Inject` is tested through the loader that will grade the result
+  rather than through the writer that produced it.
 - **The reference solution** (`internal/eval/reference_test.go`) — the
   generate → digest → eval pipeline, in-process, on every `go test`: the pinned
   corpus (seed 42, `--today 2026-08-30`) is generated, the deterministic page is
@@ -190,8 +203,12 @@ What a green gate still does not prove, and the honest list is short:
   there and is it cited". "Does it read like the sample, in Avery's voice" is
   the judge's question, and the judge informs rather than blocks.
 - **Nothing about a corpus other than the pinned one.** Seed 42 at
-  `--today 2026-08-30` is one exam. Dataset mutation testing — perturb the dates
-  and senders, the traps must still be caught — is explicitly week two.
+  `--today 2026-08-30` is one exam. `--adversarial` is the first crack at that
+  — a model writes tasks nobody here thought of and the harness re-runs over a
+  copy with them injected — but it needs a model, so it is outside the gate and
+  a green `make check` says nothing about it. Dataset mutation testing —
+  perturb the dates and senders, the traps must still be caught — is still
+  explicitly week two.
 - **The score can be right for the wrong reason.** The graders assert outcomes,
   not paths (EVAL-PRINCIPLES #6): a trap surfaced by an extractor other than the
   one the answer key expected still passes, and the mismatch is printed rather
@@ -210,6 +227,7 @@ has watched fail is a gate nobody knows works.
 | **Capability suite** (`aubade-lab eval --capability`: agentic digest, N=3 isolated trials in `out/trial-N/`, `pass^3` / `pass@3`) | Non-deterministic and needs a model runner. Runs when the claude CLI is present, with a loud SKIP otherwise — never a silent one — and it never touches the exit code either way. Observed on 2026-08-30 against claude 2.1.251: 3/3 trials composed agentically, 20/20 tasks at pass^3, every citation on every page grounded in that trial's own `signals.json`. |
 | **`make check-agentic`** (`scripts/agentic-e2e.sh`) | The live agentic digest against the real claude CLI: two model-driven runs over the seeded corpus. It proves what no unit test can — that claude accepts the flags aubade hands it on the version installed here, that the allowlisted loop really calls `aubade tool`, that the composed page survived aubade's own citation check, and that `--customize` reshaped the page while the honesty floor stayed on it. Skips **loudly** when claude is absent, with a banner saying the agentic digest is unverified on this machine. |
 | **Sabotage runs** (`aubade-lab eval --sabotage=<extractor>`) | On-demand and periodic. It proves the *graders* can see: the score must drop when an extractor is disabled, and an ALARM (banner plus non-zero exit) says it did not. A check on the exam, not on the commit — a gate that goes red because a deliberately broken engine scored badly teaches people to ignore the gate. Observed drops on the pinned corpus: commitments −1, quiet-threads −4, conflicts −3, contradictions −1, dispatchables −2, suppressions −1, staleness −1. |
+| **Adversarial suite** (`aubade-lab eval --adversarial`) | Traps this repository did not write. A model is shown the corpus, the profile and the existing catalog and asked for ~3 situations that are *not* in it; each is validated against the scenario contract (`internal/eval/authored.go`) and rejected-with-reasons plus re-asked exactly once if it breaks it. What survives is injected into a **copy** of the dataset under `out/adversarial/` — the original is opened read-only and left byte-identical, which `TestAdversarialLeavesTheOriginalCorpusByteIdentical` holds — and the deterministic harness is re-run over the copy. It never gates: the tasks did not exist before the run and will differ on the next one, so a miss is coverage news rather than a regression, and the card re-grades the planted key over the same page as a control. Observed on 2026-08-31 against claude 2.1.251: three scenarios authored, all three accepted on the first attempt, **1/3 caught** — the engine missed a commitment the counterparty had explicitly released ("commitments surfaced it; it must not appear") and a reference call booked in Eastern time that collides with a Pacific block only once the zone is read. Control clean (20/20 planted tasks still passing), exit 0, and `data/` still byte-identical to a fresh `generate`. Two real gaps, found by an exam nobody here wrote. |
 | **Judge grader** (`aubade-lab eval --judge`) | Model-scored voice/readability. Layer 2, by definition not binary, so it informs but never blocks. It judges the agentic trial when the capability suite ran and the deterministic page otherwise, and says which on the card. Observed on 2026-08-30: it graded the `--no-llm` page `reads-like-a-machine` — evidence the anchors discriminate rather than sitting at the top. |
 | **`make fmt-check`** | Advisory. Formatting noise should not be able to block a correctness fix. |
 | **Learning tests** (`learning-tests/`) | They drive the real claude and codex CLIs: cost, auth, and non-determinism — three separate disqualifications. See §3.4. |
@@ -419,16 +437,19 @@ The passes that are deliberately outside the gate, in the order you would reach
 for them:
 
 ```
-bin/aubade-lab eval --adversarial            # how each negative task stayed out
+bin/aubade-lab eval --negatives              # how each negative task stayed out
 bin/aubade-lab eval --sabotage=conflicts     # can the graders still see? (non-zero on ALARM)
 bin/aubade-lab eval --capability             # agentic, N=3 trials, pass^3 / pass@3
+bin/aubade-lab eval --adversarial            # traps we did not write, injected into a copy
 bin/aubade-lab eval --judge                  # layer 2: does it read like the sample
 make check-agentic                           # the live agentic digest, end to end
 ```
 
-All four read the run in `out/`, so produce one first (`make e2e`, or the two
-commands it runs). The last three need the claude CLI and say so loudly when it
-is missing.
+All five read the run in `out/`, so produce one first (`make e2e`, or the two
+commands it runs). The last four need the claude CLI and say so loudly when it
+is missing. `--adversarial` also writes into `out/adversarial/` — the injected
+copy of the corpus, the page composed from it, and the scenarios the model
+wrote; `--data` itself is never written to.
 
 To watch the gate block, rather than trusting that it would:
 

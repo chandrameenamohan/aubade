@@ -50,6 +50,10 @@ type reference struct {
 	Artifacts *Artifacts
 	Day       time.Time
 	Loc       *time.Location
+
+	// Dir is the corpus on disk. The adversarial suite copies it, so its tests
+	// need the directory and not only the loaded corpus.
+	Dir string
 }
 
 // buildReference generates the pinned corpus and composes the deterministic
@@ -80,7 +84,7 @@ func buildReference(t *testing.T) reference {
 	if err != nil {
 		t.Fatalf("compose: %v", err)
 	}
-	return reference{Traps: plan.Traps, Corpus: corpus, Artifacts: a, Day: day, Loc: loc}
+	return reference{Traps: plan.Traps, Corpus: corpus, Artifacts: a, Day: day, Loc: loc, Dir: dir}
 }
 
 // The reference digest catches every planted trap and surfaces none of the

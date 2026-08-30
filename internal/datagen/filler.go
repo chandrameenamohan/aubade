@@ -144,7 +144,7 @@ var bulkWindows = []arrivalWindow{{5 * 60, 7 * 60}, {9 * 60, 17 * 60}}
 // an unlucky draw.
 func (f *filler) slotAfter(t time.Time, windows []arrivalWindow, businessOnly bool) time.Time {
 	day := f.s.At(t, 0, 0)
-	for range CorpusDays + lookaheadDays {
+	for range CorpusDays + LookaheadDays {
 		if businessOnly && !isBusinessDay(day) {
 			day = day.AddDate(0, 0, 1)
 			continue

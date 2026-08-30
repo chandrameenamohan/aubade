@@ -173,7 +173,7 @@ func (f *filler) calendar() {
 // next week's meeting and this week's problem, so next week has to have a
 // calendar at all.
 func (f *filler) standing() {
-	for offset := -CorpusDays + 1; offset <= lookaheadDays; offset++ {
+	for offset := -CorpusDays + 1; offset <= LookaheadDays; offset++ {
 		day := f.s.Days(offset)
 		for _, r := range standingWeek {
 			switch {

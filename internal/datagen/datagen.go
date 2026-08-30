@@ -44,10 +44,14 @@ import (
 // the anchor date (SPEC §1).
 const CorpusDays = 30
 
-// lookaheadDays is how far past the anchor date the calendar is allowed to
+// LookaheadDays is how far past the anchor date the calendar is allowed to
 // reach. The digest is about today, but "someone booked over your Tuesday
 // deep-work block" is next week's meeting and this week's problem.
-const lookaheadDays = 14
+//
+// It is exported because the adversarial suite validates authored events
+// against the same window before injecting them, and a second copy of the
+// number in another package is a window that drifts.
+const LookaheadDays = 14
 
 // seedStream is the second word of the PCG seed. It is a constant so that one
 // --seed always names one stream, and it is not zero so that --seed 0 is still
@@ -193,7 +197,7 @@ func (p *Plan) validate() error {
 			errs = append(errs, fmt.Errorf("duplicate event UID %q", ev.UID))
 		}
 		seenEvent[ev.UID] = true
-		errs = append(errs, p.inWindow("event "+ev.UID, ev.Start, CorpusDays, lookaheadDays))
+		errs = append(errs, p.inWindow("event "+ev.UID, ev.Start, CorpusDays, LookaheadDays))
 	}
 	seenNote := map[string]bool{}
 	for _, n := range p.Notes {
