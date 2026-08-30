@@ -32,6 +32,7 @@ Other targets:
 | `make build` | both binaries into `./bin/` |
 | `make test` | unit tests only |
 | `make e2e` | the end-to-end scenario only |
+| `make golden` | rewrite the committed golden digests (see §2) |
 | `make hooks` | install the local git hooks (see §4) |
 | `make fmt` / `make fmt-check` | gofmt; `fmt-check` is advisory, not in the gate |
 | `make clean` | remove `bin/` and `out/` |
@@ -76,6 +77,24 @@ API keys and no network beyond the Go module cache:
   resolve to a record in the corpus. These fixtures are deliberately *not* the
   generated corpus: an extractor graded only against the data its own teammate
   planted proves less than one graded against a corpus written to trip it.
+- **The digest composer** (`internal/digest`) — scoring, sectioning, drafting
+  and rendering, over two pinned fixture corpora under
+  `internal/digest/testdata/`, each with a **committed golden page** compared
+  byte for byte. The goldens are the cheapest real proof here: one assertion
+  catches a re-ranking, a dropped citation, a reworded honesty line and a
+  changed section order, and turns each of them into a reviewable diff instead
+  of nothing at all. They are regenerated only through `make golden` — a
+  deliberate act with a diff to read, never a silent self-heal.
+  The two corpora are chosen against each other: one where every extractor
+  fires, both drafting registers appear and a section overflows; one degraded —
+  three sources missing, an inbox four days past the profile's freshness budget,
+  no profile at all — which is the page that has to be honest about itself.
+  Around the goldens, the properties that must not drift are asserted directly:
+  the page is byte-identical across six independently loaded corpora, every
+  rendered line carries a resolvable citation, uncertainty is routed to "I'm not
+  sure" whatever the extractor hinted, contradictions render both sides with a
+  citation each, and no draft is written for the person the profile protects or
+  contains an answer the corpus does not.
 - **The end-to-end regression scenario** (once bead D1 lands) — `aubade-lab generate`
   is seeded, `aubade digest --no-llm` runs a fixed extractor order over that fixed
   corpus, and `aubade-lab eval` asserts each planted trap present and each negative
@@ -108,9 +127,12 @@ someone eventually cites it as proof of something it never checked.
 
 So today, a green `make check` proves: **it compiles, it vets, and the unit tests
 pass** — including the toolbox's own trap-shaped tests over its hand-written
-fixtures. It does not yet prove any *digest* is correct, because no digest exists,
-and it does not prove the extractors behave on the generated 500-email corpus,
-because that corpus is bead B1's and the eval that grades it is bead D1's.
+fixtures, and the digest composer's golden pages over its own. What it still
+does not prove is that a digest built from the *generated* corpus catches the
+planted traps: that corpus is bead B1's, and the eval that joins the exam to the
+student is bead D1's. A green gate says the composer does the same thing today
+that it did yesterday, over fixtures we wrote; it does not yet say the answers
+are right.
 
 Bead D1 replaces the stub body with the real scenario (SPEC "End-to-end
 verification scenario") and the script starts failing the gate on any regression
@@ -136,10 +158,21 @@ bin/aubade-lab eval --out out/          # non-zero exit on any regression miss
 
 `aubade tool` and `aubade signals` are real as of bead C1: they load a corpus,
 run the extractors, and emit cited signals (`aubade signals` writes
-`out/signals.json`). The rest still exit 1 with `not implemented yet (bead X)`
-and name the bead that will build them: `aubade digest` (C2), `aubade schedule`
-(E1), `aubade-lab generate` (B1), `aubade-lab eval` (D1). Stubs exit **non-zero**
-on purpose — a stub that exits 0 lets a gate go green over an empty binary.
+`out/signals.json`). `aubade digest --no-llm` is real as of bead C2: it composes
+the full one-pager from those signals and writes `out/digest.md` with
+`out/signals.json` beside it, with no network and no keys.
+
+`aubade digest` **without** `--no-llm` — agentic mode — still exits 1 and names
+its bead (C3), and it does not fall back to the template. Composing the page a
+different way than the user asked for would be exactly the quiet substitution
+this product exists not to make. `--customize` with `--no-llm` is refused for
+the same reason: customization reshapes the compose stage, and `--no-llm` has no
+compose stage to reshape.
+
+The remaining stubs still exit 1 with `not implemented yet (bead X)` and name
+the bead that will build them: `aubade schedule` (E1), `aubade-lab generate`
+(B1), `aubade-lab eval` (D1). Stubs exit **non-zero** on purpose — a stub that
+exits 0 lets a gate go green over an empty binary.
 
 ### 3.4 Learning tests — the dependencies the gate cannot touch
 

@@ -25,7 +25,8 @@ var Version = "0.1.0-dev"
 // StubError is returned by a command whose behaviour is not built yet. It names
 // the bead that will implement it, so a `not implemented` message is a pointer
 // into the plan rather than a dead end. Bead ids track the orchestrator's plan:
-// B1 dataset generator, C1 deterministic toolbox, C2 digest renderer,
+// B1 dataset generator, C1 deterministic toolbox, C2 digest scoring, sectioning
+// and rendering (`--no-llm`), C3 the agentic orchestrator over that toolbox,
 // D1 eval harness, E1 scheduling design.
 type StubError struct {
 	Command string // e.g. "aubade digest"

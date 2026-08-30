@@ -93,20 +93,25 @@ shown, rather than a coin flip. One runner installed means single-runner,
 silently. --consensus=off is the frugal flag.
 
 The honesty layer is not customizable: --customize reshapes format, never
-truthfulness.`),
+truthfulness.
+
+--no-llm writes out/digest.md and, beside it, the out/signals.json it was
+composed from — so a wrong line can be diagnosed as mis-ranked or as missed,
+which are two different bugs.`),
 		Args: cobra.NoArgs,
-		RunE: stub("C2", "renders the digest from signals (--no-llm), then the agentic orchestrator"),
+		RunE: func(c *cobra.Command, _ []string) error { return runDigest(c) },
 	}
 
 	f := c.Flags()
+	f.String("data", defaultDataDir, "corpus directory (inbox.jsonl, calendar.ics, notes/, tasks.md, profile.md)")
 	f.String("today", "", "anchor date, YYYY-MM-DD (default: system date, America/Los_Angeles)")
 	f.String("customize", "", "path to a prompt.md that reshapes the digest format (agentic mode only)")
 	f.Bool("no-llm", false, "fixed-order extractors + default template: no network, no API keys")
 	f.String("runner", "claude", "orchestration runner: claude|codex|gemini")
 	f.String("consensus", "on", "fan one-shot decisions to every installed runner and majority-vote: on|off")
-	f.String("out", "out/", "directory for digest.md and the run's artifacts")
+	f.String("out", defaultOutDir, "directory for digest.md and the run's artifacts")
+	f.Bool("json", false, "emit the run as JSON (default when an AI agent caller is detected)")
 
-	annotate(c, "C2")
 	return c
 }
 
