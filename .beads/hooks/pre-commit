@@ -22,3 +22,20 @@ if command -v bd >/dev/null 2>&1; then
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
 # --- END BEADS INTEGRATION v0.61.0 ---
+
+# --- BEGIN AUBADE GATE ---
+# Installed by scripts/install-hooks.sh (or `make hooks`). The gate's definition
+# lives in the tracked .claude/hooks/gate.sh, so this block cannot drift from it.
+_aubade_root=$(git rev-parse --show-toplevel)
+_aubade_gate="$_aubade_root/.claude/hooks/gate.sh"
+if [ ! -x "$_aubade_gate" ]; then
+  echo "pre-commit: $_aubade_gate missing or not executable; run scripts/install-hooks.sh" >&2
+  exit 1
+fi
+if ! "$_aubade_gate"; then
+  echo >&2
+  echo "pre-commit: gate is RED — commit refused. Reproduce with: make check" >&2
+  echo "(escape hatch, for genuine emergencies only: git commit --no-verify)" >&2
+  exit 1
+fi
+# --- END AUBADE GATE ---

@@ -4,6 +4,9 @@
 *.db
 idocs/
 
+# Backups made by scripts/install-hooks.sh when it appends to an existing hook
+*.pre-aubade.bak
+
 # Build output
 bin/
 

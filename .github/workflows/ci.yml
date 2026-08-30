@@ -1,0 +1,67 @@
+name: ci
+
+# CI mirrors the local gate rather than redefining it: the `check` job runs
+# `make check`, the same target the pre-commit hook runs through
+# .claude/hooks/gate.sh. If CI and the laptop can disagree about what "green"
+# means, one of them is lying, and it is always the one you are not looking at.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (make check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: make check
+        run: make check
+
+      # Artifacts are best-effort: until bead D1 wires the end-to-end run,
+      # neither file is produced, and a missing artifact must not turn the gate
+      # red — `if-no-files-found: ignore` is what makes that explicit rather
+      # than accidental.
+      - name: Upload digest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest
+          path: out/digest.md
+          if-no-files-found: ignore
+
+      - name: Upload scorecard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard
+          path: out/scorecard.md
+          if-no-files-found: ignore
+
+  capability-eval:
+    name: capability suite (manual)
+    # Manual only, by design. The capability suite is non-deterministic (agentic
+    # mode, N=3 trials, reported as pass^3 / pass@3) and needs a model runner;
+    # non-deterministic checks never gate (SPEC §8). It stays a button someone
+    # presses, not a thing that fails a pull request at 2am.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: |
+          echo "capability suite runs locally; wired in bead D1"
