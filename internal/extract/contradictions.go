@@ -2,6 +2,8 @@ package extract
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/chandrameenamohan/aubade/internal/model"
@@ -12,7 +14,7 @@ import (
 // it" — so nothing in this file resolves anything. Both sides go into the
 // signal with their own citation, and the renderer shows both.
 //
-// Two disagreements are detectable from the corpus:
+// Three disagreements are detectable from the corpus:
 //
 //  1. **The mail and the calendar name different times for the same meeting.**
 //     Someone writes "moved to Thursday at 2" and the invite still says
@@ -24,6 +26,11 @@ import (
 //     invite is CANCELLED, or the owner declined it, and someone is still
 //     writing "see you at 3". That one is a genuine trap: both sources are
 //     internally consistent and only disagree with each other.
+//  3. **A note says something slipped and the mail says it did not.** The
+//     internal record of a call says the customer pushed their renewal to next
+//     quarter; the customer's own mail, days later, is still targeting the
+//     original date. Nobody is lying and no calendar is involved — which is why
+//     it is here rather than folded into the two cases above.
 //
 // The horizon is a week each side of the anchor day. Beyond that, an email
 // about "Thursday" is almost certainly about a different Thursday.
@@ -48,9 +55,41 @@ var stillOnPhrases = []string{
 	"looking forward to", "talk then", "on for", "we're on",
 }
 
+// slippedPhrases are a note recording that something moved out.
+var slippedPhrases = []string{
+	"pushed", "pushed to", "moved to next", "next quarter", "next month",
+	"delayed", "deferred", "postponed", "slipped", "put off", "on hold",
+	"paused", "not this quarter", "won't happen this", "off the table",
+}
+
+// holdingPhrases are the other source carrying on as if nothing moved.
+var holdingPhrases = []string{
+	"still targeting", "still on", "still planning", "still expecting",
+	"confirming", "on track for", "as planned", "unchanged", "no change",
+	"go live on", "renewal date", "same date",
+}
+
+// accountTokenOverlap is how many distinctive words a note and an email have to
+// share before they are about the same account. It is the same bar the meeting
+// matcher uses, and for the same reason: one shared word is a coincidence, and
+// a fabricated contradiction is worse than a missed one.
+const accountTokenOverlap = 2
+
+// noteHorizon bounds how far apart a note and a mail can be and still be about
+// the same open question. A month is the corpus window; past that the note is
+// history rather than a live claim.
+const noteHorizon = 30 * 24 * time.Hour
+
 // Contradictions reports sources that disagree, keeping both sides.
 func (t *Toolbox) Contradictions() (model.Signals, error) {
 	g := newIDs()
+	out := t.calendarContradictions(g)
+	out = append(out, t.noteContradictions(g)...)
+	return out, nil
+}
+
+// calendarContradictions compares the mail against the calendar.
+func (t *Toolbox) calendarContradictions(g *ids) model.Signals {
 	var out model.Signals
 
 	for i := range t.corpus.Events {
@@ -89,7 +128,106 @@ func (t *Toolbox) Contradictions() (model.Signals, error) {
 			}
 		}
 	}
-	return out, nil
+	return out
+}
+
+// noteContradictions compares what the notes recorded against what the mail
+// since then has said.
+//
+// The match is by account, not by meeting: a note titled "Veritas renewal —
+// call notes" and mail from someone at veritas.example are about the same thing
+// even though the mail never writes the customer's name. That is why the
+// sender's domain joins the email's own words in the token set — without it the
+// only shared word is "renewal", and one shared word is a coincidence.
+//
+// Only the *later* source is allowed to be the one still holding: a note
+// written after the mail has already superseded it, and reporting that as a
+// disagreement would flag every question that got answered.
+func (t *Toolbox) noteContradictions(g *ids) model.Signals {
+	var out model.Signals
+
+	for i := range t.corpus.Notes {
+		n := &t.corpus.Notes[i]
+		if !n.HasDate() || n.Date.After(t.now) {
+			continue
+		}
+		want := distinctiveTokens(n.Title)
+		if len(want) < accountTokenOverlap {
+			continue
+		}
+		slipped, ok := firstSentenceMatching(n.Body, slippedPhrases)
+		if !ok {
+			continue
+		}
+
+		for j := range t.corpus.Emails {
+			e := &t.corpus.Emails[j]
+			if !e.TS.After(n.Date) || e.TS.After(t.now) || e.TS.Sub(n.Date) > noteHorizon {
+				continue
+			}
+			if _, suppressed := t.supp.email(e.ID); suppressed {
+				continue
+			}
+			if overlapCount(accountTokens(e), want) < accountTokenOverlap {
+				continue
+			}
+			holding, ok := firstSentenceMatching(e.Body, holdingPhrases)
+			if !ok {
+				continue
+			}
+			out = append(out, t.noteContradiction(g, n, e, slipped, holding))
+			// One disagreement per note. The same slipped commitment restated
+			// in three replies is one thing to go and settle, not three.
+			break
+		}
+	}
+	return out
+}
+
+// noteContradiction renders a note and a mail that disagree, keeping both.
+func (t *Toolbox) noteContradiction(g *ids, n *model.Note, e *model.Email, slipped, holding string) model.Signal {
+	return model.Signal{
+		ID:       g.next(model.KindContradictions, "note", n.Path, e.ID),
+		Kind:     model.KindContradictions,
+		Priority: atMost(t.prio.Of(e.From, e.Labels).Priority, model.P2),
+		Title:    fmt.Sprintf("note and mail disagree on %s", truncate(n.Title, 60)),
+		Detail: fmt.Sprintf("%s (%s) records %s; %s wrote %s on %s. Both sides are shown; neither was picked.",
+			n.Path, n.Date.In(t.loc).Format("Mon 2 Jan"), quote(slipped),
+			e.From.String(), quote(holding), e.TS.In(t.loc).Format("Mon 2 Jan 15:04")),
+		Citations:   []model.Citation{noteCite(n.Path), emailCite(e.ID)},
+		SectionHint: model.SectionHonesty,
+		Confidence:  model.Certain,
+	}
+}
+
+// accountTokens are the words that say which account a message is about: its
+// own text, plus the label of the sender's domain. "luis@veritas.example" is
+// the only place the customer's name appears in a mail that never writes it.
+func accountTokens(e *model.Email) []string {
+	toks := distinctiveTokens(e.Subject + " " + e.Body)
+	domain := domainOf(e.From.Email)
+	if i := strings.Index(domain, "."); i > 0 {
+		domain = domain[:i]
+	}
+	if len(domain) >= 4 {
+		if st := stem(domain); !slices.Contains(toks, st) {
+			toks = append(toks, st)
+		}
+	}
+	return toks
+}
+
+// firstSentenceMatching returns the first sentence of body carrying one of the
+// phrases. Sentence-scoped like every other lexicon here: a body that mentions
+// "pushed" in one paragraph and "still on" in another is a conversation, not a
+// contradiction.
+func firstSentenceMatching(body string, phrases []string) (string, bool) {
+	for _, s := range sentences(body) {
+		if containsAny(s, phrases) {
+			return s, true
+		}
+	}
+	return "", false
 }
 
 // timeContradiction compares what an email says about a meeting's time against

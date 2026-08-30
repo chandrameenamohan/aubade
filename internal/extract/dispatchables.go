@@ -43,6 +43,14 @@ var smallAskPhrases = []string{
 	"let me know if", "let me know when", "let me know by", "need a yes",
 	"need your ok", "need a decision", "can you send", "could you send",
 	"any chance", "are you free", "does tuesday", "does wednesday",
+	// Approvals are the smallest ask there is and they almost never arrive as
+	// a question: "three expense reports need your approval" is a sentence, and
+	// the reply that closes it is a click. A dispatchables extractor that only
+	// reads question marks finds none of them, which is exactly the class of
+	// item profile.md complains about losing.
+	"need your approval", "needs your approval", "need approval", "needs approval",
+	"waiting on your approval", "waiting for your approval", "approval needed",
+	"need your sign-off", "needs your sign-off", "please approve", "one click",
 }
 
 // dispatchTaskVerbs open a task that is itself one reply.

@@ -27,7 +27,7 @@ var Version = "0.1.0-dev"
 // into the plan rather than a dead end. Bead ids track the orchestrator's plan:
 // B1 dataset generator, C1 deterministic toolbox, C2 digest scoring, sectioning
 // and rendering (`--no-llm`), C3 the agentic orchestrator over that toolbox,
-// D1 eval harness, E1 scheduling design.
+// D1 eval harness, E1 scheduling design — of which only E1 is still a stub.
 type StubError struct {
 	Command string // e.g. "aubade digest"
 	Bead    string // e.g. "C2"

@@ -3,19 +3,28 @@
 # e2e-regression.sh — the gate's end-to-end scenario (SPEC "End-to-end
 # verification scenario").
 #
-# STATUS: STUB. Bead D1 replaces the body below with the real run:
-#
-#     aubade-lab generate --seed 42 --today "$TODAY" --out data/
+#     aubade-lab generate --seed 42 --today <fixed> --out data/
 #     aubade digest --no-llm --out out/
 #     aubade-lab eval --out out/
 #
-# and this script then exits non-zero whenever a regression trap is missed.
+# Three binaries' worth of behaviour, joined: the exam, the student, and the
+# grader. Everything upstream of this is verified against fixtures its own
+# author chose — this is the only check that says the answers are right.
 #
-# Why it exits 0 today: `make check` is wired into the pre-commit hook from bead
-# A2 onward, so a red e2e before the engine exists would make it impossible to
-# commit the engine. The stub is deliberately loud instead of silent — a check
-# that is not yet running must say so on every single run, or the gate quietly
-# becomes theatre. There is exactly one line to delete when D1 lands.
+# Why it drives the real binaries instead of calling into the packages: the
+# thing we ship is the thing we test. `go test` already runs the same scenario
+# in-process (internal/eval/reference_test.go), which is faster and fails inside
+# the package that broke; this one additionally proves the two commands can be
+# driven from a shell, that they write the files they promise, and that the
+# harness exits non-zero when it should.
+#
+# It is deterministic and needs no key, no network and no model, which is what
+# earns it a place in `make check`. The agentic capability suite is deliberately
+# not here: non-deterministic checks never gate (VERIFICATION.md §2). Run it with
+# `bin/aubade-lab eval --capability`, or `make check-agentic` for the live
+# end-to-end.
+#
+# Runtime: a few seconds. If this ever stops being fast, it stops being run.
 
 set -euo pipefail
 
@@ -23,50 +32,52 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 # Pinned anchor date for the regression corpus. The dataset is generated
-# relative to this, so the committed golden digest stays valid.
+# relative to this, so the committed reference digest stays valid.
 TODAY="${AUBADE_E2E_TODAY:-2026-08-30}"
 SEED="${AUBADE_E2E_SEED:-42}"
 
+# The scenario writes where CI looks for its artifacts: out/digest.md and
+# out/scorecard.md are uploaded from a run of this script.
+DATA="${AUBADE_E2E_DATA:-data}"
+OUT="${AUBADE_E2E_OUT:-out}"
+
 if [[ -t 1 ]]; then
-	YELLOW=$'\033[33m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
+	RED=$'\033[31m'; GREEN=$'\033[32m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
 else
-	YELLOW=''; BOLD=''; RESET=''
+	RED=''; GREEN=''; BOLD=''; RESET=''
 fi
 
-cat <<BANNER
-${YELLOW}${BOLD}
-================================================================================
-  PENDING: regression eval wired in bead D1
-================================================================================
-  This is a STUB. The end-to-end regression scenario is NOT running yet.
-
-  When bead D1 lands, this script will run, and fail the gate on any miss:
-
-      bin/aubade-lab generate --seed ${SEED} --today ${TODAY} --out data/
-      bin/aubade digest --no-llm --out out/
-      bin/aubade-lab eval --out out/
-
-  Until then \`make check\` proves: vet + build + unit tests only.
-  Treat a green gate accordingly.
-================================================================================
-${RESET}
-BANNER
-
-# --- Bead D1: delete everything below this line and run the pipeline above. ---
-
-# The one thing the stub CAN prove today: the binaries the scenario will drive
-# actually exist and are runnable. A stub that checks nothing at all is worse
-# than no stub, because it teaches the reader that this file is inert.
-missing=0
-for b in aubade aubade-lab; do
-	if [[ ! -x "bin/$b" ]]; then
-		echo "e2e: bin/$b not built (run 'make build')" >&2
-		missing=1
-	fi
-done
-if [[ "$missing" -ne 0 ]]; then
+fail() {
+	printf '%s%se2e FAIL:%s %s\n' "$RED" "$BOLD" "$RESET" "$*" >&2
 	exit 1
+}
+step() { printf '%s    %s%s\n' "$BOLD" "$*" "$RESET"; }
+
+for b in aubade aubade-lab; do
+	[[ -x "bin/$b" ]] || fail "bin/$b not built (run 'make build')"
+done
+
+# ── 1 · write the exam ──────────────────────────────────────────────────────
+step "generate --seed $SEED --today $TODAY --out $DATA/"
+./bin/aubade-lab generate --seed "$SEED" --today "$TODAY" --out "$DATA" >/dev/null \
+	|| fail "the generator did not run"
+
+# ── 2 · sit it ──────────────────────────────────────────────────────────────
+step "digest --no-llm --data $DATA/ --out $OUT/"
+./bin/aubade digest --no-llm --data "$DATA" --today "$TODAY" --out "$OUT" >/dev/null \
+	|| fail "the deterministic digest did not run"
+
+[[ -s "$OUT/digest.md" ]]   || fail "no page at $OUT/digest.md"
+[[ -s "$OUT/signals.json" ]] || fail "no fact base at $OUT/signals.json"
+
+# ── 3 · grade it ────────────────────────────────────────────────────────────
+# The harness prints the whole scorecard, which is what a reader of a failed CI
+# run wants in the log. Its exit code is the gate: non-zero on any missed trap.
+step "eval --data $DATA/ --out $OUT/"
+if ! ./bin/aubade-lab eval --data "$DATA" --today "$TODAY" --out "$OUT"; then
+	fail "the regression suite is RED — see the scorecard above and $OUT/scorecard.md"
 fi
 
-echo "e2e: binaries present (bin/aubade, bin/aubade-lab); scenario pending bead D1"
-exit 0
+[[ -s "$OUT/scorecard.md" ]] || fail "the harness exited 0 without writing $OUT/scorecard.md"
+
+printf '%s    e2e: GREEN — %s and %s written%s\n' "$GREEN" "$OUT/digest.md" "$OUT/scorecard.md" "$RESET"
