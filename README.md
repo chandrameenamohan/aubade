@@ -155,8 +155,12 @@ against the same Runner interface — a natural next addition, not yet shipped.
 The process is as deliberate as the code, and it is visible in the repo:
 
 - **Issue tracking is [beads](https://github.com/steveyegge/beads) (`bd`),
-  backed by DoltDB.** The work graph lives in `.beads/` — a Dolt database
-  (`.beads/dolt/`), versioned like the code it tracks. The whole build is four
+  backed by DoltDB and hosted on DoltHub.** The work graph lives in `.beads/` —
+  a Dolt database (`.beads/dolt/`), versioned like the code it tracks and
+  pushed to its own remote:
+  [dolthub.com/repositories/cmm/idailydigest](https://www.dolthub.com/repositories/cmm/idailydigest).
+  Every bead — epics, tasks, dependency edges, status history — is in that
+  database, browsable and cloneable without this repo. The whole build is four
   epics with dependency edges: **A** Foundation & harness (scaffold,
   `make check` gate proven red/green, learning tests against the real claude
   and codex CLIs), **B** The exam (synthetic dataset + trap catalog, born
@@ -171,6 +175,12 @@ The process is as deliberate as the code, and it is visible in the repo:
   `learning-tests/` pins what claude and codex actually do headlessly; the
   gemini runner is *absent* from the registry precisely because it was never
   probed against a real binary.
+- **Team coordination runs on [SageOx](https://sageox.ai).** The humans and AI
+  coworkers building this share one team context —
+  [sageox.ai/team/team_icxdwi8r5b](https://sageox.ai/team/team_icxdwi8r5b) —
+  where sessions are recorded, decisions and conventions live, and prior work
+  is searchable (`ox query`, `ox code search`). An agent joining a session
+  primes from it (`ox agent prime`) before touching code.
 
 ### Contributing
 
@@ -179,15 +189,23 @@ The process is as deliberate as the code, and it is visible in the repo:
    fails `make check` is not reviewable, it is red.
 3. Track your work in beads: `bd list --all` for the graph,
    `bd create` for a new issue, close it when the gate is green. The Dolt-backed
-   database in `.beads/` travels with the repo.
-4. Respect the two load-bearing invariants: extractors stay **pure** (same
+   database in `.beads/` travels with the repo, and its remote of record is
+   DoltHub —
+   [cmm/idailydigest](https://www.dolthub.com/repositories/cmm/idailydigest) —
+   so the issue history is inspectable (and `dolt clone`-able) even without a
+   checkout. Push bead changes there the same way you push code.
+4. If you are on the team, join the SageOx team context
+   ([team_icxdwi8r5b](https://sageox.ai/team/team_icxdwi8r5b)) and run
+   `ox agent prime` at session start — prior sessions, decisions, and
+   conventions live there, and `ox query "<question>"` beats re-deriving them.
+5. Respect the two load-bearing invariants: extractors stay **pure** (same
    corpus + same `--today` ⇒ byte-identical signals — the trap eval depends on
    it), and any change to trap behaviour updates the answer key in the same
    commit (`aubade-lab eval` is the judge).
-5. Adding a model runner is a one-file adapter against the `Runner` interface
+6. Adding a model runner is a one-file adapter against the `Runner` interface
    plus a `Register` call in `internal/runner/registry.go` — but only after a
    learning test against the real binary. An unprobed runner is not a voter.
-6. Model-dependent tests skip **loudly** when a CLI is absent; if your change
+7. Model-dependent tests skip **loudly** when a CLI is absent; if your change
    touches the agentic path, run `make check-agentic` with a live runner before
    the PR.
 
