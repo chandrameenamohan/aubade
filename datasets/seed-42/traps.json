@@ -1,0 +1,460 @@
+[
+  {
+    "id": "commitment-cap-table-slip",
+    "kind": "commitment-slip",
+    "description": "Avery promised Marcus Webb the updated cap table twice — \"by wednesday\" ten days ago and \"tonight\" three days ago — and no message in the thread ever carried it. The task is past due and still open, and Ben is holding the file waiting to be told to send it. Second slip on the same commitment to the lead investor: this is the one thing to do first.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "commitments",
+      "keywords": [
+        "cap table",
+        "Marcus Webb"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-capt-02"
+      },
+      {
+        "source": "email",
+        "ref": "m-capt-04"
+      },
+      {
+        "source": "task",
+        "ref": "t-cap-table"
+      }
+    ]
+  },
+  {
+    "id": "commitment-board-update-overdue",
+    "kind": "commitment-slip",
+    "description": "The board update Avery committed to in notes/board-update-cadence.md is ten days past its due date and nothing has been sent since the update twenty-five days ago. Diane Okafor does not chase, so nothing in the inbox will ever raise this — it has to come from the note, the last-sent email, and the open task read together.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "commitments",
+      "keywords": [
+        "board update",
+        "Diane Okafor"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "note",
+        "ref": "notes/board-update-cadence.md"
+      },
+      {
+        "source": "email",
+        "ref": "m-board-01"
+      },
+      {
+        "source": "task",
+        "ref": "t-board-update"
+      }
+    ]
+  },
+  {
+    "id": "quiet-investor-aperture",
+    "kind": "quiet-investor",
+    "description": "David Kim at Aperture Capital replied within a day twice, then went silent on Avery's direct question — four business days ago, during an active raise. profile.md wants this after three business days, not three weeks.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "quiet-threads",
+      "keywords": [
+        "Aperture Capital",
+        "David Kim"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-aperture-01"
+      },
+      {
+        "source": "email",
+        "ref": "m-aperture-04"
+      }
+    ]
+  },
+  {
+    "id": "cadence-slowdown-northstar",
+    "kind": "cadence-slowdown",
+    "description": "Dana Whitfield at Northstar Foods replied inside a day for the first fortnight of the thread and now takes five, and has not answered Avery's last check-in at all. No ticket, no complaint — the only evidence is the widening gap between messages in a reference customer's thread.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "quiet-threads",
+      "keywords": [
+        "Northstar",
+        "reply cadence"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-northstar-09"
+      },
+      {
+        "source": "email",
+        "ref": "m-northstar-10"
+      },
+      {
+        "source": "note",
+        "ref": "notes/customer-health.md"
+      }
+    ]
+  },
+  {
+    "id": "stalled-designer-loop",
+    "kind": "stalled-loop",
+    "description": "The designer loop has not moved in eight days and the last message in it is the candidate's own follow-up, addressed to Avery. profile.md: a candidate mid-loop with nobody moving them for five or more days is on her.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "quiet-threads",
+      "keywords": [
+        "Ravi Desai",
+        "designer loop"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-hiring-01"
+      },
+      {
+        "source": "email",
+        "ref": "m-hiring-03"
+      },
+      {
+        "source": "note",
+        "ref": "notes/hiring-status.md"
+      }
+    ]
+  },
+  {
+    "id": "conflict-double-booked",
+    "kind": "calendar-overlap",
+    "description": "Two confirmed meetings on today's calendar overlap from 10:45 to 11:15: the Lumen Analytics demo and the Series A diligence prep with Ben. Avery is on both invites and has accepted one of them.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "conflicts",
+      "keywords": [
+        "Lumen Analytics",
+        "diligence prep"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "calendar",
+        "ref": "ev-lumen-demo"
+      },
+      {
+        "source": "calendar",
+        "ref": "ev-diligence-prep"
+      }
+    ]
+  },
+  {
+    "id": "conflict-deep-work-block",
+    "kind": "deep-work-violation",
+    "description": "Tomás booked the Pipeline review inside the standing Tuesday 9-11am deep-work block, and added it at 21:40 last night without asking. profile.md is explicit that Avery wants to be told when this happens.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "conflicts",
+      "keywords": [
+        "deep work",
+        "Pipeline review"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "calendar",
+        "ref": "ev-deep-work-20260901"
+      },
+      {
+        "source": "calendar",
+        "ref": "ev-pipeline-review"
+      }
+    ]
+  },
+  {
+    "id": "conflict-family-collision",
+    "kind": "family-collision",
+    "description": "Sam added \"Wren — pediatrician\" to the shared calendar at 21:04 last night. It overlaps the 14:30 Q2 planning sync and runs to the start of the 16:00 interview prep. Family first, per profile.md — and no drafted reply to Sam, ever.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "conflicts",
+      "keywords": [
+        "Wren",
+        "pediatrician"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "calendar",
+        "ref": "ev-wren-pediatrician"
+      },
+      {
+        "source": "calendar",
+        "ref": "ev-q2-planning-sync"
+      }
+    ]
+  },
+  {
+    "id": "contradiction-diligence-call-day",
+    "kind": "source-contradiction",
+    "description": "The calendar still has the Series A diligence call with Marcus on Friday; the email thread moved it to the Monday after and both sides agreed. Neither source was updated to match the other. Both sides must be rendered with citations — picking one and hiding the other is the failure profile.md names by hand.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "contradictions",
+      "keywords": [
+        "diligence call",
+        "Monday"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "calendar",
+        "ref": "ev-marcus-diligence-call"
+      },
+      {
+        "source": "email",
+        "ref": "m-dcall-01"
+      },
+      {
+        "source": "email",
+        "ref": "m-dcall-02"
+      }
+    ]
+  },
+  {
+    "id": "contradiction-veritas-renewal",
+    "kind": "source-contradiction",
+    "description": "The Veritas renewal note says their CFO pushed the conversation to next quarter; their procurement lead emailed two days later confirming the September 30 date is still on. A note and an email disagree, and the digest must show both.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "contradictions",
+      "keywords": [
+        "Veritas",
+        "renewal"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "note",
+        "ref": "notes/customer-veritas-renewal.md"
+      },
+      {
+        "source": "email",
+        "ref": "m-veritas-01"
+      }
+    ]
+  },
+  {
+    "id": "staleness-undated-model-note",
+    "kind": "stale-data",
+    "description": "notes/series-a-model.md has no date in its front matter, so nothing can tell how old it is. An open task points at it and it speaks to a diligence question, so the digest has every reason to cite it — and must say it cannot age the source rather than presenting it as current.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "staleness",
+      "keywords": [
+        "series-a-model",
+        "inference cost model"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "note",
+        "ref": "notes/series-a-model.md"
+      },
+      {
+        "source": "task",
+        "ref": "t-cost-model"
+      }
+    ]
+  },
+  {
+    "id": "dispatchable-halberd-yes-no",
+    "kind": "quick-reply",
+    "description": "Renee Tan at Halberd needs a yes or no on the rollout before her stakeholder meeting tomorrow, and Jordan's status mail three days earlier already says engineering is on track. One sentence, in Avery's voice, ready to send.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "dispatchables",
+      "keywords": [
+        "Halberd",
+        "rollout"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-halberd-02"
+      },
+      {
+        "source": "email",
+        "ref": "m-halberd-01"
+      }
+    ]
+  },
+  {
+    "id": "dispatchable-expense-approvals",
+    "kind": "quick-reply",
+    "description": "Three expense reports are waiting on Avery's approval and are blocking team payouts. No judgement required, seconds to clear, and exactly the kind of thing that stays in the inbox for a fortnight.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "dispatchables",
+      "keywords": [
+        "expense report",
+        "approval"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-expenses-01"
+      }
+    ]
+  },
+  {
+    "id": "recruiter-pattern-kestrel",
+    "kind": "recruiter-pattern",
+    "description": "Three different recruiters at Kestrel Search cold-emailed Avery inside a week. Individually each is P4 and suppressed; three from one firm in a week is the pattern profile.md asks to be told about — as a pattern, never as three threads.",
+    "must_surface": true,
+    "expect": {
+      "signal_kind": "suppressions",
+      "keywords": [
+        "Kestrel Search",
+        "recruiter"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-kestrel-01"
+      },
+      {
+        "source": "email",
+        "ref": "m-kestrel-02"
+      },
+      {
+        "source": "email",
+        "ref": "m-kestrel-03"
+      }
+    ]
+  },
+  {
+    "id": "negative-newsletter-stratechery",
+    "kind": "newsletter",
+    "description": "A genuinely good newsletter issue, on-topic for Tessera's market, that arrived yesterday morning. profile.md suppresses newsletters by name and then names this one: relevance is not the test, and \"I'll read them when I want to\" is the rule.",
+    "must_surface": false,
+    "expect": {
+      "signal_kind": "suppressions",
+      "keywords": [
+        "Stratechery",
+        "The Weekly Update"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-newsletter-01"
+      }
+    ]
+  },
+  {
+    "id": "negative-vendor-marketing-pagerail",
+    "kind": "vendor-marketing",
+    "description": "Product-marketing mail from a SaaS vendor Tessera actually pays for. Being a paying customer of the sender is what makes this tempting to surface, and profile.md rules it out anyway.",
+    "must_surface": false,
+    "expect": {
+      "signal_kind": "suppressions",
+      "keywords": [
+        "Pagerail",
+        "AI incident summaries"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-vendor-01"
+      }
+    ]
+  },
+  {
+    "id": "negative-fyi-only",
+    "kind": "fyi-only",
+    "description": "An internal forward from a P1 colleague about real regulation, whose own first line says no action is needed and nothing applies this year. It must not become a dispatchable, a to-do, or an urgent item.",
+    "must_surface": false,
+    "expect": {
+      "signal_kind": "dispatchables",
+      "keywords": [
+        "EU AI Act"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-fyi-01"
+      }
+    ]
+  },
+  {
+    "id": "negative-avery-last-word",
+    "kind": "last-word",
+    "description": "Nine days of silence on a thread — because Avery closed it with a decision and there is nothing left to say. A quiet-thread detector that only measures elapsed time surfaces this one, and every one like it, until the section is noise.",
+    "must_surface": false,
+    "expect": {
+      "signal_kind": "quiet-threads",
+      "keywords": [
+        "offsite venue",
+        "Presidio"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-offsite-02"
+      }
+    ]
+  },
+  {
+    "id": "negative-accepted-invite",
+    "kind": "accepted-invite",
+    "description": "A recurring meeting on today's calendar that Avery accepted three weeks ago and that conflicts with nothing. There is no decision, no conflict and no news in it, so it must not be surfaced as one.",
+    "must_surface": false,
+    "expect": {
+      "signal_kind": "conflicts",
+      "keywords": [
+        "Weekly leadership sync"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "calendar",
+        "ref": "ev-leadership-sync"
+      }
+    ]
+  },
+  {
+    "id": "negative-quiet-below-threshold",
+    "kind": "below-threshold",
+    "description": "Avery's last message on the Brightmoor thread has gone unanswered for two business days. The rule is three, so this is silence that has not earned a line in the digest yet — the near-miss that proves quiet-thread detection implements a threshold rather than flagging every unanswered message.",
+    "must_surface": false,
+    "expect": {
+      "signal_kind": "quiet-threads",
+      "keywords": [
+        "security questionnaire",
+        "Brightmoor"
+      ]
+    },
+    "planted_refs": [
+      {
+        "source": "email",
+        "ref": "m-brightmoor-01"
+      },
+      {
+        "source": "email",
+        "ref": "m-brightmoor-02"
+      }
+    ]
+  }
+]

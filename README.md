@@ -31,6 +31,8 @@ make build                       # → ./bin/aubade and ./bin/aubade-lab
 ./bin/aubade-lab generate --seed 42 --today 2026-08-30 --out data/
 #   → data/{inbox.jsonl, calendar.ics, notes/, tasks.md, profile.md, traps.json}
 #     14 traps that must surface, 6 that must not. Same seed ⇒ byte-identical.
+#     A committed copy of this exact dataset is browsable at datasets/seed-42/
+#     (byte-identical to what the command above regenerates — that's the determinism claim).
 
 ./bin/aubade digest --no-llm --today 2026-08-30    # ← the zero-key path
 #   → out/digest.md, plus the out/signals.json it was composed from
