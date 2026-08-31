@@ -88,6 +88,29 @@ the same `--today` always produces the same output — that purity is what makes
 the trap eval possible. When an AI agent is the caller, these commands emit JSON
 with no `--json` flag, because detection already established who is asking.
 
+## Works with other agent CLIs (tested)
+
+The agent-caller claim above is tested, not aspirational — verified 2026-08-31
+against Cursor's CLI (`cursor-agent`) and OpenAI's Codex CLI. Reproduce each in
+under a minute (after `make build` and a `generate`):
+
+```bash
+# Detection alone: an agent env marker flips output to JSON — no flag needed
+CURSOR_AGENT=1 ./bin/aubade tool suppressions | head -3
+
+# Cursor drives the toolbox headlessly
+cursor-agent -p "Run ./bin/aubade tool commitments --json in this directory and report the signal count"
+
+# Codex drives it (its read-only sandbox is fine — the tools only read data/)
+codex exec --skip-git-repo-check "Run ./bin/aubade tool commitments --json and report the signal count"
+```
+
+Observed: both CLIs were auto-detected and served the JSON envelope with no
+`--json` flag, and both read the tools' output correctly (signal counts and
+citations quoted back). Codex is additionally a registered consensus voter
+(`--runner` knows `claude` and `codex`); a Cursor voter is a one-file adapter
+against the same Runner interface — a natural next addition, not yet shipped.
+
 ## Where to read next
 
 | File | What it answers |
