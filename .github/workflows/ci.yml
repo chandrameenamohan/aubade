@@ -20,8 +20,14 @@ concurrency:
 
 jobs:
   check:
-    name: check (make check)
-    runs-on: ubuntu-latest
+    name: check (make check, ${{ matrix.os }})
+    # Both OSes, because development happens on macOS and a gate that only
+    # proves Linux is a gate that lies to the machine it is written on.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: digest
+          name: digest-${{ matrix.os }}
           path: out/digest.md
           if-no-files-found: ignore
 
@@ -53,8 +59,125 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scorecard
+          name: scorecard-${{ matrix.os }}
           path: out/scorecard.md
+          if-no-files-found: ignore
+
+  cli-evals:
+    name: cli evals — claude/codex/cursor (${{ matrix.os }})
+    # Runs on every change so a code change that hurts the agentic evals is
+    # seen on the PR that caused it — but `continue-on-error` keeps it
+    # informational: it calls real models, so it costs money, needs auth, and
+    # is non-deterministic, and non-deterministic checks never gate
+    # (VERIFICATION.md §2). Red here is a finding to read, not a merge blocker.
+    #
+    # Auth comes from repo secrets, and each half SKIPS LOUDLY when its token
+    # is absent — a warning annotation, never a quiet green:
+    #   claude:  CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`, runs on
+    #            the Claude subscription) or ANTHROPIC_API_KEY (API billing)
+    #   codex:   OPENAI_API_KEY (`codex login --api-key`; there is no
+    #            subscription token, and copying auth.json rots silently)
+    #   cursor:  CURSOR_API_KEY (from the Cursor dashboard)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    continue-on-error: true
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      AUBADE_E2E_TODAY: "2026-08-30"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Build and generate the seeded corpus
+        run: |
+          make build
+          ./bin/aubade-lab generate --seed 42 --today 2026-08-30 --out data/
+
+      # The AX claim, asserted on both OSes with no model and no key: an agent
+      # env marker flips output to JSON with no --json flag. This is the part
+      # of "works with cursor" that costs nothing, so it always runs.
+      - name: Agent-caller detection (free, always runs)
+        run: |
+          out="$(CURSOR_AGENT=1 ./bin/aubade tool suppressions --data data/ --today 2026-08-30)"
+          case "$out" in
+            "["*|"{"*) echo "detection: JSON served to a cursor-marked caller" ;;
+            *) echo "::error::agent detection failed: output did not start as JSON"; exit 1 ;;
+          esac
+
+      - name: Install the CLIs this run can authenticate
+        run: |
+          if [ -n "${ANTHROPIC_API_KEY}${CLAUDE_CODE_OAUTH_TOKEN}" ]; then
+            npm install -g @anthropic-ai/claude-code
+            claude --version
+          fi
+          if [ -n "$OPENAI_API_KEY" ]; then
+            npm install -g @openai/codex
+            codex login --api-key "$OPENAI_API_KEY"
+            codex --version
+          fi
+          if [ -n "$CURSOR_API_KEY" ]; then
+            curl -fsS https://cursor.com/install | bash
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+            echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+          fi
+
+      # The claude eval: the same script `make check-agentic` runs locally —
+      # agentic digest, consensus, citation check, --customize, the honesty
+      # floor. Its own loud-skip banner fires when claude is not installed
+      # (i.e. no claude secret), and the warning below makes the skip visible
+      # in the run summary, not just the log.
+      - name: claude — agentic eval (make check-agentic)
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}${CLAUDE_CODE_OAUTH_TOKEN}" ]; then
+            echo "::warning::claude eval SKIPPED: no CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY secret. The agentic digest is unverified on ${{ matrix.os }}."
+          fi
+          make check-agentic
+
+      # The codex eval: codex's role in the engine is consensus voter, so the
+      # check is the footer naming it. A digest with both CLIs live must say
+      # "answered: claude, codex" — that line is the product's own audit trail,
+      # so grading it needs no extra machinery.
+      - name: claude + codex — consensus roster names both voters
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}${CLAUDE_CODE_OAUTH_TOKEN}" ] || [ -z "$OPENAI_API_KEY" ]; then
+            echo "::warning::consensus roster check SKIPPED: needs both a claude secret and OPENAI_API_KEY. Two-voter consensus is unverified on ${{ matrix.os }}."
+            exit 0
+          fi
+          ./bin/aubade digest --today 2026-08-30 --data data/ --out out-live/
+          grep -F 'answered: claude, codex' out-live/digest.md \
+            || { echo "::error::footer does not say 'answered: claude, codex' — codex did not vote"; tail -4 out-live/digest.md; exit 1; }
+          tail -4 out-live/digest.md
+
+      # The cursor eval: cursor is not a registered runner (no adapter yet), so
+      # its verified claim is the README's — cursor-agent drives the toolbox
+      # headlessly and reads the cited JSON back correctly.
+      - name: cursor — drives the toolbox headlessly
+        run: |
+          if [ -z "$CURSOR_API_KEY" ]; then
+            echo "::warning::cursor eval SKIPPED: no CURSOR_API_KEY secret. cursor-agent driving the toolbox is unverified on ${{ matrix.os }}."
+            exit 0
+          fi
+          cursor-agent --trust -p "Run ./bin/aubade tool commitments --data data/ --today 2026-08-30 --json in this directory and report only the number of signals it printed" \
+            | tee cursor-drive.out
+          [ -s cursor-drive.out ] || { echo "::error::cursor-agent produced no output"; exit 1; }
+
+      - name: Upload live digest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-evals-digest-${{ matrix.os }}
+          path: out-live/digest.md
           if-no-files-found: ignore
 
   capability-eval:
@@ -84,10 +207,11 @@ jobs:
           ./bin/aubade-lab generate --seed 42 --today 2026-08-30 --out data/
           ./bin/aubade digest --no-llm --data data/ --today 2026-08-30 --out out/
 
-      # No claude on a hosted runner, so the capability half skips loudly and
-      # says the agentic digest is unverified here. That is the correct outcome
-      # and it is why the step is not conditional on the CLI being present: a
-      # skip nobody sees is indistinguishable from a pass.
+      # No claude on a hosted runner unless the cli-evals secrets are set, so
+      # the capability half skips loudly and says the agentic digest is
+      # unverified here. That is the correct outcome and it is why the step is
+      # not conditional on the CLI being present: a skip nobody sees is
+      # indistinguishable from a pass.
       - name: Capability suite (skips loudly without claude)
         run: ./bin/aubade-lab eval --data data/ --today 2026-08-30 --out out/ --capability --adversarial
 
